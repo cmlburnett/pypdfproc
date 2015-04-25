@@ -277,6 +277,19 @@ class PageTreeNode(PDFHigherBase):
 	def __repr__(self):				return str(self)
 	def __str__(self):				return "<%s parent=%s count=%d kids=%s>" % (self.__class__.__name__, self.Parent, self.Count, [id(k) for k in self.Kids])
 
+	def DFSPages(self):
+		ret = []
+
+		for k in self.Kids:
+			if k.Type == 'Page':
+				ret.append(k)
+			elif k.Type == 'Pages':
+				ret = ret + k.DFSPages()
+			else:
+				raise TypeError("Unrecognized kid type (%s) of PageTreeNode: expected Page or Pages" % k.Type)
+
+		return ret
+
 class Page(PDFHigherBase):
 	# Table 3.27 (pg 145-8) of 1.7 spec
 	_Type = None

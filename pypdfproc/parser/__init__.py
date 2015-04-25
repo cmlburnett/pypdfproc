@@ -375,6 +375,10 @@ class PDFTokenizer:
 	def _DynamicLoader(self, obj, key, value):
 		klass = obj.__class__
 
+		# This is never an indirect object for any object
+		if key == 'Type':
+			return value
+
 		if klass == _pdf.Catalog:
 			if key == 'Pages':
 				# Catalog.Pages is a PageTreeNode
