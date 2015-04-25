@@ -319,39 +319,26 @@ class PDFTokenizer:
 		return self.GetObject(ind.objid, ind.generation, self._ParseCatalog)
 
 	def GetPageTreeNode(self, ind):
-		o = self.GetObject(ind.objid, ind.generation, self._ParsePageTreeNode)
-		return o
+		return self.GetObject(ind.objid, ind.generation, self._ParsePageTreeNode)
 
 	def GetPageTreeNodeOrPage(self, ind):
-		o = self.GetObject(ind.objid, ind.generation, self._ParsePageTreeNodeOrPage)
-		return o
+		return self.GetObject(ind.objid, ind.generation, self._ParsePageTreeNodeOrPage)
 
 	def GetPage(self, ind):
-		o = self.GetObject(ind.objid, ind.generation, self._ParsePage)
-		return o
+		return self.GetObject(ind.objid, ind.generation, self._ParsePage)
 
 
 	def _ParseCatalog(self, objidgen, tokens):
 		return self._StupidObjectParser(objidgen, tokens, _pdf.Catalog)
 
 	def _ParsePageTreeNode(self, objidgen, tokens):
-		o = self._StupidObjectParser(objidgen, tokens, _pdf.PageTreeNode)
-
-		# Always set this if it's not provided
-		if '_Parent' not in o.__dict__:
-			o.__dict__['_Parent'] = None
-
-		return o
+		return self._StupidObjectParser(objidgen, tokens, _pdf.PageTreeNode)
 
 	def _ParsePageTreeNodeOrPage(self, objidgen, tokens):
-		o = self._ParserPageTreeNodeOrPageOject(objidgen, tokens)
-
-		return o
+		return self._ParserPageTreeNodeOrPageOject(objidgen, tokens)
 
 	def _ParsePage(self, objidgen, tokens):
-		o = self._StupidObjectParser(objidgen, tokens, _pdf.Page)
-
-		return o
+		return self._StupidObjectParser(objidgen, tokens, _pdf.Page)
 
 	def _ParserPageTreeNodeOrPageOject(self, objidgen, tokens):
 		"""
