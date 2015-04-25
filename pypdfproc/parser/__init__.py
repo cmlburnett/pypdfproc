@@ -95,6 +95,11 @@ class PDFTokenizer:
 
 		self.pdf = _pdf.PDF()
 
+		# Read header line
+		h = self.ParseHeader(0)
+		self.pdf.AddContentToMap(0, h)
+
+
 		# Read trailer at end of file
 		gotoend(self.file)
 
@@ -153,6 +158,27 @@ class PDFTokenizer:
 
 		# Could return self.pdf but I don't see the need at this point (keep it interal)
 		#return self.pdf
+
+	def ParseHeader(self, offset):
+		# Jump to header
+		self.file.seek(offset)
+
+		# Expected is "%PDF-X.X\r\x...\x...\x...\x..."
+		# The \x bytes are to convince FTP programs that it's binary
+		# The X.X is the version, so tease that out of that nastyness
+
+		line = self.file.readline()
+		line = line.decode('latin-1')
+		parts = line.split()
+		if not parts[0].startswith('%PDF-'):
+			raise ValueError("File does not begin with %PDF and therefore is not a PDF")
+
+		# Split "%PDF-X.X" to ["%PDF", "X.X"]
+		parts = parts[0].split('-')
+
+		h = _pdf.Header()
+		h.version = parts[1]
+		return h
 
 	def ParseXref(self, offset):
 		"""
