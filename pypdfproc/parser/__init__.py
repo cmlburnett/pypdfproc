@@ -242,31 +242,107 @@ class PDFTokenizer:
 		# Convert tokens to python objects
 		return TokenHelpers.Convert_Trailer(toks)
 
-	def FindRootObject(self):
-		x = self.pdf.rootxref
-		t = x.trailer
+	def LoadObject(self, objid, generation, handler=None):
+		"""
+		Loads an object, regardless of cache, as a token stream if handler is not provided.
+		"""
 
-		while x != None:
-			print([x,t])
-
-			if 'Root' in t.dictionary:
-				v = t.dictionary['Root']
-				print(v)
-
-			x = x.next
-			t = t.next
-
-	def LoadObject(self, objid, generation):
 		k = (objid, generation)
 
 		if k not in self.pdf.objmap:
 			raise ValueError("Object %d (generation %d) not found in file" % (objid, generation))
 
-		raise NotImplemented()
+		# Get offset and seek to it
+		offset = self.pdf.objmap[k]
+		self.file.seek(offset)
+
+		# FIXME: I don't like this solution but it worse for now since I haven't hit objects larger than 512 kB
+		# Read a block and tokenize it
+		dat = self.file.read(512*1024).decode('latin-1')
+
+		# Stop at endobj token and consolidate
+		toks = pdfloc.TokenizeString(dat, stoptoken="endobj")
+		toks = pdfloc.ConsolidateTokens(toks)
+
+		# Process the token stream into something better
+		# The result should not have tokens or any similar concept (separation of layers)
+		o = handler(k, toks)
+
+		# Return processed token stream
+		return o
+
+	def GetObject(self, objid, generation, handler):
+		"""
+		Pull an object from the cache or load it if it's not loaded yet.
+		Must provide a handler to convert raw object data into something meaningful.
+		"""
+
+		k = (objid, generation)
+
+		# Check the cache first
+		if k in self.pdf.objcache:
+			return self.pdf.objcache[k]
+
+		# Load object
+		o = self.LoadObject(objid, generation, handler)
+
+		# Store in cache
+		self.pdf.objcache[k] = o
+
+		# Return object
+		return o
+
+	def FindRootObject(self):
+		"""
+		Iterates through xref/trailer combos until the /Root (X X R) is found indicating the root object of the document.
+		"""
+
+		x = self.pdf.rootxref
+		t = x.trailer
+
+		while x != None:
+			if 'Root' in t.dictionary:
+				v = t.dictionary['Root']
+				# This should be an indirect
+				return v
+
+			x = x.next
+			t = t.next
+
+	def GetRootObject(self):
+		"""
+		Find the root object, process it, and return it.
+		"""
+
+		ind = self.FindRootObject()
+
+		return self.GetObject(ind.objid, ind.generation, self._ParseRoot)
+
+	def _ParseRoot(self, objidgen, tokens):
+		return self._StupidObjectParser(objidgen, tokens, _pdf.Root)
+
+	def _StupidObjectParser(self, objidgen, tokens, klass):
+		"""
+		This takes an object (tokens[0]) and pulls out the data (tokens[0].value[2]) and converts that into
+		a dictionary object and blindly sets the attributes on an instance of @klass.
+		"""
+
+		o = TokenHelpers.Convert(tokens[0].value[2])
+
+		r = klass()
+		for k in o[0]:
+			setattr(r, k, o[0][k])
+
+		return r
 
 class TokenHelpers:
 	@staticmethod
 	def Convert(tok):
+		# Handle a native list separately from below
+		if type(tok) == list:
+			return [TokenHelpers.Convert(p) for p in tok]
+
+
 		if tok.type in ('NAME', 'INT', 'FLOAT'):
 			return tok.value
 		elif tok.type == 'HEXSTRING':
@@ -282,6 +358,8 @@ class TokenHelpers:
 			o = _pdf.Array()
 			o.array = [TokenHelpers.Convert(z) for z in tok.value]
 			return o
+		elif tok.type == 'DICT':
+			return TokenHelpers.Convert_Dictionary(tok)
 		else:
 			raise ValueError("Unknown token type '%s'" % tok.type)
 

@@ -328,11 +328,15 @@ class ConsolidateTokensClass:
 			if cnt == 0:
 				break
 
+		arrval = tokens[startpos+1:i]
+		# Run through array and make sure every element is processed
+		arrval = ConsolidateTokens(arrval)
+
 		#NB: tokens[i].type == 'ARR_END'
 
 		tok = plylex.LexToken()
 		tok.type = 'ARR'
-		tok.value = tokens[startpos+1:i]
+		tok.value = arrval
 		tok.lineno = tokens[startpos].lineno
 		tok.lexpos = tokens[startpos].lexpos
 

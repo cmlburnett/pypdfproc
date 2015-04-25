@@ -102,6 +102,8 @@ class Dictionary(PDFBase):
 	def __getitem__(self, k):		return self.dictionary[k]
 	def __setitem__(self, k,v):		self.dictionary[k] = v
 
+	def __iter__(self):				return iter(self.dictionary)
+
 	def __repr__(self):				return str(self)
 	def __str__(self):				return "<%s %s>" % (self.__class__.__name__, str(self.dictionary))
 
@@ -184,4 +186,46 @@ class Object(PDFBase):
 
 class EOF(PDFBase):
 	pass
+
+# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# Higher-order PDF parts
+
+class Root(PDFBase):
+	# Table 3.25 (pg 139-142) of 1.7 spec
+	Type = None
+	Version = None
+	Pages = None
+	PageLabels = None
+	Names = None
+	Dests = None
+	ViewerPreferences = None
+	PageLayout = None
+	PageMode = None
+	Outlines = None
+	Threads = None
+	OpenAction = None
+	AA = None
+	URI = None
+	AcroForm = None
+	Metadata = None
+	StructTreeRoot = None
+	MarkInfo = None
+	Lang = None
+	SpiderInfo = None
+	OutputIntents = None
+	PieceInfo = None
+	OCProperties = None
+	Perms = None
+	Legal = None
+	Requirements = None
+	Collection = None
+	NeedsRendering = None
+
+class PageTreeNode(PDFBase):
+	# Table 3.26 (pg 143) of 1.7 spec
+	Type = None
+	Parent = None
+	Kids = None
+	Count = None
 
