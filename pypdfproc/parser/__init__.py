@@ -7,9 +7,17 @@ from .. import pdf as _pdf
 __all__ = ['PDFTokenizer']
 
 def gotoend(f):
+	"""
+	Helper function that jumps to lass byte in the file.
+	"""
+
 	f.seek(-1, os.SEEK_END)
 
 def readlinerev(f, n=1):
+	"""
+	Helper function that reads @n lines in reverse.
+	"""
+
 	if n == 1:
 		return _readlinerev(f)
 
@@ -19,10 +27,16 @@ def readlinerev(f, n=1):
 	return lines
 
 def _readlinerev(f):
+	"""
+	Helper function that reads a single line in reverse.
+	"""
+
+	# Stop at start of file
 	ofs = f.tell()
 	if ofs == 0:
 		return None
 
+	# Iterate until EOL is found
 	startidx = ofs
 	endidx = ofs
 	while ofs >= 0:
@@ -132,9 +146,14 @@ class PDFTokenizer:
 		return p
 
 	def ParseXref(self, offset):
+		"""
+		Parses an xref section into a pdf.XRef object that represents all of the objectid to offset maps.
+		"""
+
 		# Jump to trailer
 		self.file.seek(offset)
 
+		# Iterate backward until "trailer" is found then stop
 		lines = []
 		while True:
 			preoffset = self.file.tell()
@@ -155,9 +174,14 @@ class PDFTokenizer:
 		return TokenHelpers.Convert_XRef(toks)
 
 	def ParseTrailer(self, offset):
+		"""
+		Parses a trailer section into a pdf.Trailer object that represents the trailer dictionary and startxref offset.
+		"""
+
 		# Jump to trailer
 		self.file.seek(offset)
 
+		# Iterate until %%EOF indicating end of trailer
 		lines = []
 		while True:
 			line = self.file.readline().decode('latin-1').rstrip()
