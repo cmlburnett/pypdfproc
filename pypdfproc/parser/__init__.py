@@ -72,6 +72,10 @@ def _readlinerev(f):
 
 
 class PDFTokenizer:
+	"""
+	Tokenizer for PDF files that understand the Carousel object system.
+	"""
+
 	# File object, IOStream object, whatever as long as it meets basic read/seek/tell functionality
 	file = None
 
@@ -158,8 +162,13 @@ class PDFTokenizer:
 
 		# Could return self.pdf but I don't see the need at this point (keep it interal)
 		#return self.pdf
+		pass
 
 	def ParseHeader(self, offset):
+		"""
+		Parses the PDF header. If this goes bad then the file is not a PDF.
+		"""
+
 		# Jump to header
 		self.file.seek(offset)
 
