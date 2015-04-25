@@ -34,6 +34,7 @@ url = "http://www.candysporks.org"
 cp_license = "BSD"
 packages = [
 	"pypdfproc",
+	"pypdfproc.parser",
 ]
 data_files = [
 	('pypdfproc', [

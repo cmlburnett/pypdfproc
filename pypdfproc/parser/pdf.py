@@ -113,9 +113,3 @@ t_ignore = ''
 # Initiate lexer
 lexer = plylex.lex()
 
-class pdftokenizer:
-	file = None
-
-	def __init__(self, file):
-		self.file = file
-
