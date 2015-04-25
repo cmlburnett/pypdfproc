@@ -36,16 +36,15 @@ packages = [
 	"pypdfproc",
 ]
 data_files = [
-	('src', [,
+	('pypdfproc', [
 	]),
-	('src/parser', ['src/parser/pdf.py',
-					'src/parser/text.py'
+	('pypdfproc/parser', ['pypdfproc/parser/pdf.py',
+							'pypdfproc/parser/text.py'
 	]),
 ]
 scripts = []
 
-if sys.version_info >= (3, 0):
-    required_python_version = '3.3'
+required_python_version = '3.3'
 
 ###############################################################################
 # end arguments for setup
