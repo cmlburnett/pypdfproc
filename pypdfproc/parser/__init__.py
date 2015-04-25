@@ -400,6 +400,8 @@ class PDFTokenizer:
 			elif key in ('MediaBox', 'CropBox', 'BleedBox', 'TrimBox', 'ArtBox'):
 				if not isinstance(value, _pdf.IndirectObject):
 					return value
+			elif key == 'Contents':
+				print(value)
 
 
 		raise NotImplementedError("Dynamic loader for class '%s' and key '%s' not implemented" % (klass.__name__, key))
