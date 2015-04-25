@@ -278,6 +278,11 @@ class PageTreeNode(PDFHigherBase):
 	def __str__(self):				return "<%s parent=%s count=%d kids=%s>" % (self.__class__.__name__, self.Parent, self.Count, [id(k) for k in self.Kids])
 
 	def DFSPages(self):
+		"""
+		Do a depth-first search for Page objects.
+		This returns all Page leaf nodes in the order that they should be displayed.
+		"""
+
 		ret = []
 
 		for k in self.Kids:
