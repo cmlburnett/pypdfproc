@@ -311,7 +311,7 @@ class PDFTokenizer:
 
 	def GetRootObject(self):
 		"""
-		Find the root object, process it, and return it.
+		Find the root (catalog) object, process it, and return it.
 		"""
 
 		ind = self.FindRootObject()
@@ -346,18 +346,10 @@ class PDFTokenizer:
 	def _ParsePageTreeNodeOrPage(self, objidgen, tokens):
 		o = self._ParserPageTreeNodeOrPageOject(objidgen, tokens)
 
-		# Always set this if it's not provided
-		if '_Parent' not in o.__dict__:
-			o.__dict__['_Parent'] = None
-
 		return o
 
 	def _ParsePage(self, objidgen, tokens):
 		o = self._StupidObjectParser(objidgen, tokens, _pdf.Page)
-
-		# Always set this if it's not provided
-		if '_Parent' not in o.__dict__:
-			o.__dict__['_Parent'] = None
 
 		return o
 
@@ -373,10 +365,6 @@ class PDFTokenizer:
 		elif typ == 'Page':		r = _pdf.Page(self._DynamicLoader)
 		else:
 			raise ValueError("Unrecognized object type (%s)for this function: neither Pages nor Page" % typ)
-
-		# Always set this if it's not provided
-		if '_Parent' not in o[0].__dict__:
-			o[0].__dict__['_Parent'] = None
 
 		for k in o[0]:
 			setattr(r, '_' + k, o[0][k])
@@ -418,6 +406,10 @@ class PDFTokenizer:
 		elif klass == _pdf.Page:
 			if key == 'Parent':
 				return self.GetPageTreeNode(value)
+			elif key in ('MediaBox', 'CropBox', 'BleedBox', 'TrimBox', 'ArtBox'):
+				if not isinstance(value, _pdf.IndirectObject):
+					return value
+
 
 		raise NotImplementedError("Dynamic loader for class '%s' and key '%s' not implemented" % (klass.__name__, key))
 

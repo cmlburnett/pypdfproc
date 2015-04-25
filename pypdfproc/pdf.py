@@ -200,17 +200,37 @@ class PDFHigherBase(PDFBase):
 		self._Loader = loader
 
 	def __getattr__(self, k):
-		# If not loaded, then load it
-		if k not in self.__dict__:
-			kk = '_' + k
+		# Possibilities:
+		# 1) k is a valid property name and loaded
+		# 2) k is a valid property name and is not loaded and is None
+		# 3) k is a valid property name and is not loaded and is not None
+		# 4) k is a valid property name and was not provided in the file
+		# 5) k is not a valid property name
 
-			# No data provided to use to load it, so return None
+		kk = '_' + k
+
+		# Handle (5)
+		kval = self.__class__.__dict__[kk]
+
+		# Handle (1-3)
+		if kk in self.__dict__:
+			# Handle (2)
 			if self.__dict__[kk] == None:
-				return None
+				self.__dict__[k] = None
 			else:
-				v = self._Loader(self, k, self.__dict__[kk])
-				self.__dict__[k] = v
+				# Handle (3)
+				if k not in self.__dict__:
+					v = self._Loader(self, k, self.__dict__[kk])
+					self.__dict__[k] = v
 
+			# Handled (2-3) and also (1) require falling through
+
+		# Handles (4)
+		else:
+			# Assumes klass default value
+			self.__dict__[k] = kval
+
+		# Handle (1)
 		return self.__dict__[k]
 
 	def _Load(self, key, rawvalue):
