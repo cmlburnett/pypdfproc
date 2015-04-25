@@ -138,6 +138,7 @@ def TokenizeString(dat, pos=None, stoptoken=None):
 	tokcnt = 0
 	while True:
 		tok = lexer.token()
+		print(tok)
 		if not tok: break
 
 		# Found a name that is length, so indicate the key was seen

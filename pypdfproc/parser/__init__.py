@@ -142,6 +142,10 @@ class PDFTokenizer:
 			# Next xref is located here (if zero then no more)
 			offset = t.startxref.offset
 
+			# If there's only one xref/trailer combo then this could lead to recursively looping if this was not checked
+			if offset in self.pdf.contents:
+				break
+
 			# Link this xref/trailer combo to previous combo
 			x.prev = prevx
 			t.prev = prevt
@@ -327,6 +331,9 @@ class PDFTokenizer:
 	def GetPage(self, ind):
 		return self.GetObject(ind.objid, ind.generation, self._ParsePage)
 
+	def GetContent(self, ind):
+		return self.GetObject(ind.objid, ind.generation, self._ParseContent)
+
 
 	def _ParseCatalog(self, objidgen, tokens):
 		return self._StupidObjectParser(objidgen, tokens, _pdf.Catalog)
@@ -339,6 +346,16 @@ class PDFTokenizer:
 
 	def _ParsePage(self, objidgen, tokens):
 		return self._StupidObjectParser(objidgen, tokens, _pdf.Page)
+
+	def _ParseContent(self, objidgen, tokens):
+		d = TokenHelpers.Convert(tokens[0].value[2][0])
+		s = TokenHelpers.Convert(tokens[0].value[2][1])
+
+		r = _pdf.Content()
+		r.Dict = d
+		r.StreamRaw = s
+
+		return r
 
 	def _ParserPageTreeNodeOrPageOject(self, objidgen, tokens):
 		"""
@@ -402,7 +419,15 @@ class PDFTokenizer:
 					return value
 			elif key == 'Contents':
 				print(value)
-
+				if isinstance(value, _pdf.Array):
+					ret = []
+					for v in value.array:
+						ret.append( self.GetContent(v) )
+					return ret
+				elif isinstance(value, _pdf.IndirectObject):
+					return self.GetContent(value)
+				else:
+					raise TypeError("Unrecognized type for Page.Contents: %s" % type(value))
 
 		raise NotImplementedError("Dynamic loader for class '%s' and key '%s' not implemented" % (klass.__name__, key))
 
@@ -431,6 +456,8 @@ class TokenHelpers:
 			return o
 		elif tok.type == 'DICT':
 			return TokenHelpers.Convert_Dictionary(tok)
+		elif tok.type == 'stream':
+			return tok.value
 		else:
 			raise ValueError("Unknown token type '%s'" % tok.type)
 

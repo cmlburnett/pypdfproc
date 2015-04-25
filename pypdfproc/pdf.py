@@ -3,6 +3,8 @@ PDF classes that represent Carousel object information but in python form.
 No references to underlying parsing is made.
 """
 
+import zlib
+
 class PDF:
 	"""
 	Primary class that represents a PDF file.
@@ -330,4 +332,25 @@ class Page(PDFHigherBase):
 
 	def __repr__(self):				return str(self)
 	def __str__(self):				return "<%s %x parent=%x>" % (self.__class__.__name__, id(self), id(self.Parent))
+
+class Content(PDFBase):
+	Dict = None
+	StreamRaw = None
+
+	def __getattr__(self, k):
+		if k == 'Stream':
+			if 'Filter' in self.Dict:
+				if self.Dict['Filter'] == 'FlateDecode':
+					s = zlib.decompress(bytes(self.StreamRaw, 'latin-1'))
+					self.__dict__['Stream'] = s.decode('latin-1')
+				else:
+					raise ValueError("Unknown filter for content stream: %s" % self.Dict['Filter'])
+
+			else:
+				# No filtering
+				self.__dict__['Stream'] = self.StreamRaw
+
+			return self.__dict__['Stream']
+		else:
+			return self.__dict__[k]
 
