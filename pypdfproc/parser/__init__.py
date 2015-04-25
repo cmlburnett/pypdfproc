@@ -72,7 +72,11 @@ def _readlinerev(f):
 
 
 class PDFTokenizer:
+	# File object, IOStream object, whatever as long as it meets basic read/seek/tell functionality
 	file = None
+
+	# PDF object (i.e., _pdf.PDF); must keep a copy so other functions can build upon it as needed
+	pdf = None
 
 	def __init__(self, file):
 		if not hasattr(file, 'read'):		raise TypeError('PDF object has no read() method')
@@ -80,9 +84,7 @@ class PDFTokenizer:
 		if not hasattr(file, 'tell'):		raise TypeError('PDF object has no tell() method')
 
 		self.file = file
-
-	def ReadObject(self, objid):
-		pass
+		self.pdf = None
 
 	def Initialize(self):
 		"""
@@ -91,7 +93,7 @@ class PDFTokenizer:
 		Thus, this reads the xref sections but does not parse any objects.
 		"""
 
-		p = _pdf.PDF()
+		self.pdf = _pdf.PDF()
 
 		# Read trailer at end of file
 		gotoend(self.file)
@@ -117,13 +119,13 @@ class PDFTokenizer:
 		while offset != 0:
 			# Parse xref
 			x = self.ParseXref(offset)
-			p.AddContentToMap(offset, x)
+			self.pdf.AddContentToMap(offset, x)
 			offset = self.file.tell()
 
 			# Parse trailer that follows the xref section
 			t = self.ParseTrailer(offset)
 			x.trailer = t
-			p.AddContentToMap(offset, t)
+			self.pdf.AddContentToMap(offset, t)
 
 			# Next xref is located here (if zero then no more)
 			offset = t.startxref.offset
@@ -141,9 +143,9 @@ class PDFTokenizer:
 			prevt = t
 
 		# Now that all xrefs have been read, create the xref map to permit fast access
-		p.MakeXRefMap()
+		self.pdf.MakeXRefMap()
 
-		return p
+		# Could return self.pdf but I don't see the need at this point (keep it interal)
 
 	def ParseXref(self, offset):
 		"""
@@ -197,6 +199,9 @@ class PDFTokenizer:
 
 		# Convert tokens to python objects
 		return TokenHelpers.Convert_Trailer(toks)
+
+	def ReadObject(self, objid):
+		pass
 
 class TokenHelpers:
 	@staticmethod
