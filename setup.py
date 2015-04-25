@@ -39,8 +39,10 @@ packages = [
 data_files = [
 	('pypdfproc', [
 	]),
-	('pypdfproc/parser', ['pypdfproc/parser/pdf.py',
-							'pypdfproc/parser/text.py'
+	('pypdfproc/parser', [
+							'pypdfproc/parser/__init__.py',
+							'pypdfproc/parser/pdf.py',
+							'pypdfproc/parser/text.py',
 	]),
 ]
 scripts = []

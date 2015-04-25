@@ -124,8 +124,11 @@ class PDFTokenizer:
 
 			# Parse trailer that follows the xref section
 			t = self.ParseTrailer(offset)
-			x.trailer = t
 			self.pdf.AddContentToMap(offset, t)
+
+			# Cross-link these
+			x.trailer = t
+			t.xref = x
 
 			# Next xref is located here (if zero then no more)
 			offset = t.startxref.offset
@@ -133,6 +136,9 @@ class PDFTokenizer:
 			# Link this xref/trailer combo to previous combo
 			x.prev = prevx
 			t.prev = prevt
+
+			# Need to set root xref section in PDF object (this means prevx has not been set yet, so it is None)
+			if prevx == None:	self.pdf.rootxref = x
 
 			# Link previous xref/trailer combo to this combo
 			if prevx != None:	prevx.next = x
@@ -146,6 +152,7 @@ class PDFTokenizer:
 		self.pdf.MakeXRefMap()
 
 		# Could return self.pdf but I don't see the need at this point (keep it interal)
+		#return self.pdf
 
 	def ParseXref(self, offset):
 		"""
@@ -200,8 +207,27 @@ class PDFTokenizer:
 		# Convert tokens to python objects
 		return TokenHelpers.Convert_Trailer(toks)
 
-	def ReadObject(self, objid):
-		pass
+	def FindRootObject(self):
+		x = self.pdf.rootxref
+		t = x.trailer
+
+		while x != None:
+			print([x,t])
+
+			if 'Root' in t.dictionary:
+				v = t.dictionary['Root']
+				print(v)
+
+			x = x.next
+			t = t.next
+
+	def LoadObject(self, objid, generation):
+		k = (objid, generation)
+
+		if k not in self.pdf.objmap:
+			raise ValueError("Object %d (generation %d) not found in file" % (objid, generation))
+
+		raise NotImplemented()
 
 class TokenHelpers:
 	@staticmethod

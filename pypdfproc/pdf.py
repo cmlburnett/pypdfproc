@@ -19,10 +19,14 @@ class PDF:
 	# Indexed by (objid, generation) tuples and value is one of the classes contained within this file
 	objcache = None
 
+	# Root xref in the file
+	rootxref = None
+
 	def __init__(self):
 		self.objmap = {}
 		self.contents = {}
 		self.objcache = {}
+		self.rootxref = None
 
 	def MakeOrderedContents(self):
 		"""
@@ -54,17 +58,8 @@ class PDF:
 		# Reset map
 		self.objmap = {}
 
-		# Get ordered set to start with end xref/trailer combo
-		oc = self.MakeOrderedContents()
-
-		# Must start with last xref/trailer combo
-		if not isinstance(oc[-2], XRef):
-			raise ValueError("Expected second-to-last object in contents to be a XRef, got %s instead" % oc[-2].__class__.__name__)
-		if not isinstance(oc[-1], Trailer):
-			raise ValueError("Expected last object in contents to be a Trailer, got %s instead" % oc[-1].__class__.__name__)
-
 		# Pull out first xref/trailer combo
-		x = oc[-2]
+		x = self.rootxref
 		t = x.trailer
 
 		# Iterate until no more xref/trailer combos
@@ -103,18 +98,34 @@ class Hexstring(PDFBase):
 class Dictionary(PDFBase):
 	dictionary = None
 
+	def __contains__(self, k):		return k in self.dictionary
+	def __getitem__(self, k):		return self.dictionary[k]
+	def __setitem__(self, k,v):		self.dictionary[k] = v
+
+	def __repr__(self):				return str(self)
+	def __str__(self):				return "<%s %s>" % (self.__class__.__name__, str(self.dictionary))
+
 class Array(PDFBase):
 	array = None
+
+	def __repr__(self):				return str(self)
+	def __str__(self):				return "<%s [%s]>" % (self.__class__.__name__, str(self.array))
 
 class IndirectObject(PDFBase):
 	objid = None
 	generation = None
+
+	def __repr__(self):				return str(self)
+	def __str__(self):				return "<%s (%d %d R)>" % (self.__class__.__name__, self.objid, self.generation)
 
 class XRefMapEntry(PDFBase):
 	objid = None
 	offset = None
 	generation = None
 	inuse = None
+
+	def __repr__(self):				return str(self)
+	def __str__(self):				return "<%s (%d %d) -> %d inuse=%b>" % (self.__class__.__name__, self.objid, self.generation, self.offset, self.inuse)
 
 # ------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
@@ -125,13 +136,27 @@ class Header(PDFBase):
 
 class Trailer(PDFBase):
 	dictionary = None
+	xref = None
 	startxref = None
 
 	prev = None
 	next = None
 
+	def __repr__(self):				return str(self)
+	def __str__(self):
+		if self.prev == None:		prevtrail = "None"
+		else:						prevtrail = "%x" % id(self.prev)
+
+		if self.next == None:		nexttrail = "None"
+		else:						nexttrail = "%x" % id(self.next)
+
+		return "<%s %x prev=%s next=%s xref=%x startxref=%d %s>" % (self.__class__.__name__, id(self), prevtrail, nexttrail, id(self.xref), self.startxref.offset, str(self.dictionary))
+
 class StartXRef(PDFBase):
 	offset = None
+
+	def __repr__(self):				return str(self)
+	def __str__(self):				return "<%s %d>" % (self.__class__.__name__, self.offset)
 
 class XRef(PDFBase):
 	offsets = None
@@ -139,6 +164,19 @@ class XRef(PDFBase):
 
 	prev = None
 	next = None
+
+	def __repr__(self):				return str(self)
+	def __str__(self):
+		if self.prev == None:		prevxref = "None"
+		else:						prevxref = "%x" % id(self.prev)
+
+		if self.next == None:		nextxref = "None"
+		else:						nextxref = "%x" % id(self.next)
+
+		minobjid = min([me.objid for me in self.offsets])
+		maxobjid = max([me.objid for me in self.offsets])
+
+		return "<%s %x prev=%s next=%s trailer=%x objid=%d..%d>" % (self.__class__.__name__, id(self), prevxref, nextxref, id(self.trailer), minobjid, maxobjid)
 
 class Object(PDFBase):
 	objid = None
