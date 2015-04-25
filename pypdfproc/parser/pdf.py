@@ -299,7 +299,7 @@ class ConsolidateTokensClass:
 
 	@staticmethod
 	def Indirect(tokens, startpos, endpos):
-		if tokens[startpos].type == 'INT' and tokens[startpos+1].type == 'INT' and tokens[startpos+2].type == 'indirect':
+		if startpos+2 < endpos and tokens[startpos].type == 'INT' and tokens[startpos+1].type == 'INT' and tokens[startpos+2].type == 'indirect':
 			tok = plylex.LexToken()
 			tok.type = 'INDIRECT'
 			tok.value = (tokens[startpos].value, tokens[startpos+1].value, tokens[startpos+2].value)
@@ -420,7 +420,8 @@ class ConsolidateTokensClass:
 	def Object(tokens, startpos, endpos):
 		# This is a little weird since this function is consolidating object tokens, but it starts with two INTs before the object
 		# therefore, hit every INT and look two ahead for object type
-		if tokens[startpos].type != 'INT':	return ([tokens[startpos]], startpos)
+		if startpos+2 >= endpos:				return ([tokens[startpos]], startpos)
+		if tokens[startpos].type != 'INT':		return ([tokens[startpos]], startpos)
 		if tokens[startpos+1].type != 'INT':	return ([tokens[startpos]], startpos)
 		if tokens[startpos+2].type != 'obj':	return ([tokens[startpos]], startpos)
 

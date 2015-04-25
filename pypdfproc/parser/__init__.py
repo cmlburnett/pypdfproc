@@ -256,9 +256,9 @@ class PDFTokenizer:
 		offset = self.pdf.objmap[k]
 		self.file.seek(offset)
 
-		# FIXME: I don't like this solution but it worse for now since I haven't hit objects larger than 512 kB
+		# FIXME: I don't like this solution but it worse for now since I haven't hit objects larger than 768 kB
 		# Read a block and tokenize it
-		dat = self.file.read(512*1024).decode('latin-1')
+		dat = self.file.read(768*1024).decode('latin-1')
 
 		# Stop at endobj token and consolidate
 		toks = pdfloc.TokenizeString(dat, stoptoken="endobj")
@@ -316,24 +316,110 @@ class PDFTokenizer:
 
 		ind = self.FindRootObject()
 
-		return self.GetObject(ind.objid, ind.generation, self._ParseRoot)
+		return self.GetObject(ind.objid, ind.generation, self._ParseCatalog)
 
-	def _ParseRoot(self, objidgen, tokens):
-		return self._StupidObjectParser(objidgen, tokens, _pdf.Root)
+	def GetPageTreeNode(self, ind):
+		o = self.GetObject(ind.objid, ind.generation, self._ParsePageTreeNode)
+		return o
+
+	def GetPageTreeNodeOrPage(self, ind):
+		o = self.GetObject(ind.objid, ind.generation, self._ParsePageTreeNodeOrPage)
+		return o
+
+	def GetPage(self, ind):
+		o = self.GetObject(ind.objid, ind.generation, self._ParsePage)
+		return o
+
+
+	def _ParseCatalog(self, objidgen, tokens):
+		return self._StupidObjectParser(objidgen, tokens, _pdf.Catalog)
+
+	def _ParsePageTreeNode(self, objidgen, tokens):
+		o = self._StupidObjectParser(objidgen, tokens, _pdf.PageTreeNode)
+
+		# Always set this if it's not provided
+		if '_Parent' not in o.__dict__:
+			o.__dict__['_Parent'] = None
+
+		return o
+
+	def _ParsePageTreeNodeOrPage(self, objidgen, tokens):
+		o = self._ParserPageTreeNodeOrPageOject(objidgen, tokens)
+
+		# Always set this if it's not provided
+		if '_Parent' not in o.__dict__:
+			o.__dict__['_Parent'] = None
+
+		return o
+
+	def _ParsePage(self, objidgen, tokens):
+		o = self._StupidObjectParser(objidgen, tokens, _pdf.Page)
+
+		# Always set this if it's not provided
+		if '_Parent' not in o.__dict__:
+			o.__dict__['_Parent'] = None
+
+		return o
+
+	def _ParserPageTreeNodeOrPageOject(self, objidgen, tokens):
+		"""
+		PageTreeNode.Kids can be PageTreeNode or Page, so must check Type before picking klass.
+		"""
+
+		o = TokenHelpers.Convert(tokens[0].value[2])
+		typ = o[0]['Type']
+
+		if typ == 'Pages':		r = _pdf.PageTreeNode(self._DynamicLoader)
+		elif typ == 'Page':		r = _pdf.Page(self._DynamicLoader)
+		else:
+			raise ValueError("Unrecognized object type (%s)for this function: neither Pages nor Page" % typ)
+
+		# Always set this if it's not provided
+		if '_Parent' not in o[0].__dict__:
+			o[0].__dict__['_Parent'] = None
+
+		for k in o[0]:
+			setattr(r, '_' + k, o[0][k])
+
+		return r
 
 	def _StupidObjectParser(self, objidgen, tokens, klass):
 		"""
-		This takes an object (tokens[0]) and pulls out the data (tokens[0].value[2]) and converts that into
-		a dictionary object and blindly sets the attributes on an instance of @klass.
+		This takes an object (tokens[0]) and pulls out the data (tokens[0].value[2]) and
+		sets the dictionary of data to _Dict so that the object can load objects on demand.
 		"""
 
 		o = TokenHelpers.Convert(tokens[0].value[2])
 
-		r = klass()
+		r = klass(self._DynamicLoader)
 		for k in o[0]:
-			setattr(r, k, o[0][k])
+			setattr(r, '_' + k, o[0][k])
 
 		return r
+
+	def _DynamicLoader(self, obj, key, value):
+		klass = obj.__class__
+
+		if klass == _pdf.Catalog:
+			if key == 'Pages':
+				# Catalog.Pages is a PageTreeNode
+				return self.GetPageTreeNode(value)
+
+		elif klass == _pdf.PageTreeNode:
+			if key == 'Kids':
+				# PageTreeNode is an array of PageTreeNode and Page
+				ret = []
+				for v in value.array:
+					ret.append( self.GetPageTreeNodeOrPage(v) )
+				return ret
+			elif key == 'Count':
+				return value
+
+		elif klass == _pdf.Page:
+			if key == 'Parent':
+				return self.GetPageTreeNode(value)
+
+		raise NotImplementedError("Dynamic loader for class '%s' and key '%s' not implemented" % (klass.__name__, key))
 
 class TokenHelpers:
 	@staticmethod

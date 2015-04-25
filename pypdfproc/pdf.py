@@ -191,41 +191,105 @@ class EOF(PDFBase):
 # ------------------------------------------------------------------------------
 # Higher-order PDF parts
 
-class Root(PDFBase):
-	# Table 3.25 (pg 139-142) of 1.7 spec
-	Type = None
-	Version = None
-	Pages = None
-	PageLabels = None
-	Names = None
-	Dests = None
-	ViewerPreferences = None
-	PageLayout = None
-	PageMode = None
-	Outlines = None
-	Threads = None
-	OpenAction = None
-	AA = None
-	URI = None
-	AcroForm = None
-	Metadata = None
-	StructTreeRoot = None
-	MarkInfo = None
-	Lang = None
-	SpiderInfo = None
-	OutputIntents = None
-	PieceInfo = None
-	OCProperties = None
-	Perms = None
-	Legal = None
-	Requirements = None
-	Collection = None
-	NeedsRendering = None
+class PDFHigherBase(PDFBase):
+	_Loader = None
 
-class PageTreeNode(PDFBase):
+	def __init__(self, loader):
+		PDFBase.__init__(self)
+
+		self._Loader = loader
+
+	def __getattr__(self, k):
+		# If not loaded, then load it
+		if k not in self.__dict__:
+			kk = '_' + k
+
+			# No data provided to use to load it, so return None
+			if self.__dict__[kk] == None:
+				return None
+			else:
+				v = self._Loader(self, k, self.__dict__[kk])
+				self.__dict__[k] = v
+
+		return self.__dict__[k]
+
+	def _Load(self, key, rawvalue):
+		raise NotImplementedError("Class %s does not implement _Load function to dynamically load properties" % self.__class__.__name__)
+
+class Catalog(PDFHigherBase):
+	# Table 3.25 (pg 139-142) of 1.7 spec
+	_Type = None
+	_Version = None
+	_Pages = None
+	_PageLabels = None
+	_Names = None
+	_Dests = None
+	_ViewerPreferences = None
+	_PageLayout = None
+	_PageMode = None
+	_Outlines = None
+	_Threads = None
+	_OpenAction = None
+	_AA = None
+	_URI = None
+	_AcroForm = None
+	_Metadata = None
+	_StructTreeRoot = None
+	_MarkInfo = None
+	_Lang = None
+	_SpiderInfo = None
+	_OutputIntents = None
+	_PieceInfo = None
+	_OCProperties = None
+	_Perms = None
+	_Legal = None
+	_Requirements = None
+	_Collection = None
+	_NeedsRendering = None
+
+class PageTreeNode(PDFHigherBase):
 	# Table 3.26 (pg 143) of 1.7 spec
-	Type = None
-	Parent = None
-	Kids = None
-	Count = None
+	_Type = None
+	_Parent = None
+	_Kids = None
+	_Count = None
+
+	def __repr__(self):				return str(self)
+	def __str__(self):				return "<%s parent=%s count=%d kids=%s>" % (self.__class__.__name__, self.Parent, self.Count, [id(k) for k in self.Kids])
+
+class Page(PDFHigherBase):
+	# Table 3.27 (pg 145-8) of 1.7 spec
+	_Type = None
+	_Parent = None
+	_LasModified = None
+	_Resources = None
+	_MediaBox = None
+	_CropBox = None
+	_BleedBox = None
+	_TrimBox = None
+	_ArtBox = None
+	_BoxColorInfo = None
+	_Contents = None
+	_Rotate = None
+	_Group = None
+	_Thumb = None
+	_B = None
+	_Dur = None
+	_Trans = None
+	_Annots = None
+	_AA = None
+	_Metadata = None
+	_PieceInfo = None
+	_StructParents = None
+	_ID = None
+	_PZ = None
+	_SeparationInfo = None
+	_Tabs = None
+	_TemplateInstantiated = None
+	_PresSteps = None
+	_UserUnit = None
+	_VP = None
+
+	def __repr__(self):				return str(self)
+	def __str__(self):				return "<%s %x parent=%x>" % (self.__class__.__name__, id(self), id(self.Parent))
 
