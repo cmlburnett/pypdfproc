@@ -168,7 +168,7 @@ class PDF:
 				else:
 					pass
 
-		return " ".join(txt)
+		return "".join(txt)
 
 # FIXME: not the way to do this I don't think
 diffmap = {}
