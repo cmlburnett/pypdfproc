@@ -143,7 +143,7 @@ class PDFTokenizer:
 			offset = t.startxref.offset
 
 			# If there's only one xref/trailer combo then this could lead to recursively looping if this was not checked
-			if offset in self.pdf.contents:
+			if offset > 0 and offset in self.pdf.contents:
 				break
 
 			# Link this xref/trailer combo to previous combo
@@ -264,8 +264,51 @@ class PDFTokenizer:
 		# Read a block and tokenize it
 		dat = self.file.read(768*1024).decode('latin-1')
 
-		# Stop at endobj token and consolidate
-		toks = pdfloc.TokenizeString(dat, stoptoken="endobj")
+		# Stop at endobj token
+		# Handle streams by catching the exception, processing for the length and then recalling on second iteration of the loop
+		streamlength = None
+		while True:
+			try:
+				toks = pdfloc.TokenizeString(dat, stoptoken="endobj", streamlength=streamlength)
+				break
+			except pdfloc.NeedStreamLegnthError as e:
+				# Have to terminate object or consolidator will complain (important that e.tokens won't be used elsewhere since it is being modified)
+				t = pdfloc.plylex.LexToken()
+				t.type = 'endobj'
+				t.value = 'endobj'
+				t.lineno = 0
+				t.lexpos = 0
+				e.tokens.append(t)
+
+				# Example of e.tokens:
+				# [LexToken(INT,59,1,0), LexToken(INT,0,1,3), LexToken(obj,'obj',1,5), LexToken(DICT_START,'<<',1,8), LexToken(NAME,'Length',1,10), LexToken(INT,1070,1,18), LexToken(NAME,'Filter',1,22), LexToken(NAME,'FlateDecode',1,29), LexToken(DICT_END,'>>',1,41), LexToken(endobj,'endobj',0,0)]
+				#
+				# Consolidated:
+				# [LexToken(OBJECT,(59, 0, [LexToken(DICT,[(LexToken(NAME,'Length',1,10), LexToken(INT,1070,1,18)), (LexToken(NAME,'Filter',1,22), LexToken(NAME,'FlateDecode',1,29))],1,8)]),1,5)]
+				#
+				# Converted
+				# [<Dictionary {'Length': 1070, 'Filter': 'FlateDecode'}>]
+				#
+				# So, etoks[0] is the OBJECT toekn and etoks[0].value[2] is the DICT token
+				# and d[0] is the dictionary after converting
+
+				# Consolidate
+				etoks = pdfloc.ConsolidateTokens(e.tokens)
+				d = TokenHelpers.Convert(etoks[0].value[2])
+				dlen = d[0]['Length']
+
+				# If it's an indirect then that integer needs to be loaded
+				# Otherwise if it's an integer then nothing else needs to be done
+				if isinstance(dlen, _pdf.IndirectObject):
+					streamlength = self.LoadObject(dlen.objid, dlen.generation, self._ParseInt)
+				if type(dlen) == int:
+					streamlength = dlen
+				else:
+					raise TypeError("Unknown type for stream length: %s" % dlen)
+
+				# At this point, streamlength should be set and iterating around the loop will find a successful TokenizeString call
+
+		# Consolidate tokens
 		toks = pdfloc.ConsolidateTokens(toks)
 
 		# Process the token stream into something better
@@ -284,14 +327,14 @@ class PDFTokenizer:
 		k = (objid, generation)
 
 		# Check the cache first
-		if k in self.pdf.objcache:
-			return self.pdf.objcache[k]
+		if k in self.pdf.contents:
+			return self.pdf.contents[k]
 
 		# Load object
 		o = self.LoadObject(objid, generation, handler)
 
 		# Store in cache
-		self.pdf.objcache[k] = o
+		self.pdf.contents[k] = o
 
 		# Return object
 		return o
@@ -319,6 +362,8 @@ class PDFTokenizer:
 		"""
 
 		ind = self.FindRootObject()
+		if ind == None:
+			raise ValueError("Failed to find root catalog node")
 
 		return self.GetObject(ind.objid, ind.generation, self._ParseCatalog)
 
@@ -334,6 +379,15 @@ class PDFTokenizer:
 	def GetContent(self, ind):
 		return self.GetObject(ind.objid, ind.generation, self._ParseContent)
 
+
+	def _ParseInt(self, objidgen, tokens):
+		# Example
+		# tokens =							[LexToken(OBJECT,(5, 0, [LexToken(INT,5312,1,8)]),1,4)]
+		# tokens[0] =						LexToken(OBJECT,(5, 0, [LexToken(INT,5312,1,8)]),1,4)
+		# tokens[0].value[2] =				[LexToken(INT,5312,1,1,8)]
+		# tokens[0].value[2][0].value =		5312
+
+		return tokens[0].value[2][0].value
 
 	def _ParseCatalog(self, objidgen, tokens):
 		return self._StupidObjectParser(objidgen, tokens, _pdf.Catalog)
@@ -418,7 +472,6 @@ class PDFTokenizer:
 				if not isinstance(value, _pdf.IndirectObject):
 					return value
 			elif key == 'Contents':
-				print(value)
 				if isinstance(value, _pdf.Array):
 					ret = []
 					for v in value.array:

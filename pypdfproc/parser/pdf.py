@@ -114,8 +114,14 @@ t_ignore = ''
 lexer = plylex.lex()
 
 
+class NeedStreamLegnthError(Exception):
+	tokens = None
 
-def TokenizeString(dat, pos=None, stoptoken=None):
+	def __init__(self, message, tokens):
+		Exception.__init__(self, message)
+		self.tokens = tokens
+
+def TokenizeString(dat, pos=None, stoptoken=None, streamlength=None):
 	"""
 	NB: if @dat is a fixed size block of text then any step here may run into
 	a "IndexError: string index out of range" exception being thrown. It may be very puzzling since
@@ -130,42 +136,17 @@ def TokenizeString(dat, pos=None, stoptoken=None):
 	if pos != None:
 		lexer.lexpos = pos
 
-	# Keep track of the last length for when reading streams
-	# [0] = saw /Length
-	# [1] = INT following /Length
-	streamlength = [False, 0]
-
 	tokcnt = 0
 	while True:
 		tok = lexer.token()
-		print(tok)
+		#print(tok)
 		if not tok: break
 
-		# Found a name that is length, so indicate the key was seen
-		if tok.type == 'NAME':
-			if tok.value == 'Length':
-				streamlength[0] = True
-				streamlength[1] = -1
-
-		# Found an integer and it's after a /Length name
-		if tok.type == 'INT' and streamlength[0]:
-			streamlength[1] = tok.value
-
-			# No longer saw the length since the value is recorded
-			streamlength[0] = False
-
-		# End of dictionary means /Length was no longer seen (if it ever was)
-		if tok.type == 'DICT_END':
-			streamlength[0] = False
-
-
-
-
-		# Special handling by yanking out streamlength[1] bytes from the stream token
+		# Special handling by yanking out streamlength bytes from the stream token
 		if tok.type == 'stream':
-			if streamlength[1] < 0:
-				tok.value = None
-				continue
+			# No length provided so bail and provide tokens thus far to permit re-calling lexer with streamlength
+			if streamlength == None:
+				raise NeedStreamLegnthError("Ran into a stream without a stream length, cannot process stream", tokens)
 
 			# Leading CRLF
 			if lexer.lexdata[lexer.lexpos] == '\r':
@@ -174,18 +155,16 @@ def TokenizeString(dat, pos=None, stoptoken=None):
 				lexer.lexpos += 1
 
 			# Yank out stream data
-			tok.value = lexer.lexdata[ lexer.lexpos:(lexer.lexpos + streamlength[1]) ]
+			tok.value = lexer.lexdata[ lexer.lexpos:(lexer.lexpos + streamlength) ]
 
 			# Increment position
-			lexer.lexpos += streamlength[1]
+			lexer.lexpos += streamlength
 
 			# Trailing CRLF
 			if lexer.lexdata[lexer.lexpos] == '\r':
 				lexer.lexpos += 1
 			if lexer.lexdata[lexer.lexpos] == '\n':
 				lexer.lexpos += 1
-		if tok.type == 'endstream':
-			streamlength[1] = -1
 
 
 		# Special handling by yanking out literal text because balanced parenthesis is hard in regex

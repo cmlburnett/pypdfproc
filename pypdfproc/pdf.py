@@ -17,10 +17,6 @@ class PDF:
 	# of the classes contained within this file
 	contents = None
 
-	# Cache of objects to avoid having to repeatedly read them
-	# Indexed by (objid, generation) tuples and value is one of the classes contained within this file
-	objcache = None
-
 	# Root xref in the file
 	rootxref = None
 
