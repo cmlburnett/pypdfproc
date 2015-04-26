@@ -319,7 +319,6 @@ def TokensPostfixToPrefix(tokens):
 	lastidx = -1
 	for i in range(len(tokens)):
 		t = tokens[i]
-		#print([i, t, [ord(c) for c in t.type]])
 
 		# 0 operands
 		if t.type in ('q', 'Q', 'h', 'S', 's', 'F', 'f', 'fstar', 'B', 'B*', 'b', 'b*', 'n', 'W', 'Wstar', 'BT', 'ET', 'Tstar', 'EMC'):
@@ -591,13 +590,6 @@ def TokensPostfixToPrefix(tokens):
 
 		else:
 			raise Exception("Unrecognized token type '%s' at %d" % (tokens[i].type, i))
-
-	#if len(tokens) != (lastidx+1):
-	#	raise Exception("Found %d tokens not consumed: %s" % ((len(tokens)-(lastidx+1)), tokens[(lastidx+1):]))
-
-	#print('------------')
-	#for t in ret:
-	#	print(t)
 
 	return {'tokens': ret, 'residual': tokens[(lastidx+1):]}
 

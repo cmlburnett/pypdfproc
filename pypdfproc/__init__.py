@@ -64,5 +64,6 @@ class PDF:
 
 		toks = tt.TokenizeString(content)
 		toks = toks['tokens']
+
 		return toks
 
