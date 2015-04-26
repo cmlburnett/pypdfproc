@@ -82,6 +82,13 @@ class PDF:
 		return f
 
 	def GetFullText(self):
+		"""
+		Get the full text in the document.
+		This mashes all text into one continuous string and does not subdivide the text by page, bead, column, or anything.
+		One stream of text.
+		For example, this would be useful for making a search index.
+		"""
+
 		# Get the root object and the pages in DFS order
 		root = self.GetRootObject()
 		pages = root.Pages.DFSPages()
@@ -110,7 +117,9 @@ class PDF:
 			# Keep track of font information
 			font = {'name': None, 'size': None, 'f': None}
 
+			# Iterate through the tokens that draw text to the page
 			for tok in toks:
+				# Font information (needs to be tracked until it changes)
 				if tok.type == 'Tf':
 					font['name'] = tok.value[0].value
 					font['size'] = tok.value[1].value
@@ -130,6 +139,7 @@ class PDF:
 					#print(enc.getsetprops())
 					#print(cmap.Stream)
 
+				# Token value is a single literal of text
 				elif tok.type == 'Tj':
 					l = tok.value[0].value
 
@@ -137,6 +147,7 @@ class PDF:
 					ret = [MapCharacter(f, enc, cmap, c) for c in ret]
 					txt += ret
 
+				# Token is an array of literal and inter-character spacing integers
 				elif tok.type == 'TJ':
 					v = tok.value
 					for part in v:
@@ -152,7 +163,12 @@ class PDF:
 							raise TypeError("Unrecognize type in TJ array: %s" % part.type)
 					pass
 
-		return "".join(txt)
+				# Don't care about anything else
+				# NB: possible that state is pushed and poped (Q and q) that changes the current font information, but that's more advanced for now
+				else:
+					pass
+
+		return " ".join(txt)
 
 # FIXME: not the way to do this I don't think
 diffmap = {}
