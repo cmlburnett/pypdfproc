@@ -109,7 +109,7 @@ class Array(PDFBase):
 	array = None
 
 	def __repr__(self):				return str(self)
-	def __str__(self):				return "<%s [%s]>" % (self.__class__.__name__, str(self.array))
+	def __str__(self):				return "<%s %s>" % (self.__class__.__name__, str(self.array))
 
 class IndirectObject(PDFBase):
 	objid = None
@@ -349,4 +349,45 @@ class Content(PDFBase):
 			return self.__dict__['Stream']
 		else:
 			return self.__dict__[k]
+
+class Resource(PDFHigherBase):
+	# Table 3.30 (pg 154) of 1.7 spec
+	_ExtGState = None
+	_ColorSpace = None
+	_Pattern = None
+	_Shading = None
+	_XObject = None
+	_Font = None
+	_ProcSet = None
+	_Properties = None
+
+class GraphicsState(PDFHigherBase):
+	# Table 4.8 (pg 220-3) of 1.7 spec
+	_Type = None
+	_LW = None
+	_LC = None
+	_LJ = None
+	_ML = None
+	_D = None
+	_RI = None
+	_OP = None
+	_op = None
+	_OPM = None
+	_Font = None
+	_BG = None
+	_BG2 = None
+	_UCR = None
+	_UCR2 = None
+	_TR = None
+	_TR2 = None
+	_HT = None
+	_FL = None
+	_SM = None
+	_SA = None
+	_BM = None
+	_SMask = None
+	_CA = None
+	_ca = None
+	_AIS = None
+	_TK = None
 

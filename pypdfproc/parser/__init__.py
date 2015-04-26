@@ -168,6 +168,8 @@ class PDFTokenizer:
 		#return self.pdf
 		pass
 
+
+
 	def ParseHeader(self, offset):
 		"""
 		Parses the PDF header. If this goes bad then the file is not a PDF.
@@ -245,6 +247,8 @@ class PDFTokenizer:
 
 		# Convert tokens to python objects
 		return TokenHelpers.Convert_Trailer(toks)
+
+
 
 	def LoadObject(self, objid, generation, handler=None):
 		"""
@@ -339,6 +343,8 @@ class PDFTokenizer:
 		# Return object
 		return o
 
+
+
 	def FindRootObject(self):
 		"""
 		Iterates through xref/trailer combos until the /Root (X X R) is found indicating the root object of the document.
@@ -378,6 +384,13 @@ class PDFTokenizer:
 
 	def GetContent(self, ind):
 		return self.GetObject(ind.objid, ind.generation, self._ParseContent)
+
+	def GetResource(self, ind):
+		return self.GetObject(ind.objid, ind.generation, self._ParseResource)
+
+	def GetGraphicsState(self, ind):
+		return self.GetObject(ind.objid, ind.generation, self._ParseGraphicsState)
+
 
 
 	def _ParseInt(self, objidgen, tokens):
@@ -428,6 +441,14 @@ class PDFTokenizer:
 			setattr(r, '_' + k, o[0][k])
 
 		return r
+
+	def _ParseResource(self, objidgen, tokens):
+		return self._StupidObjectParser(objidgen, tokens, _pdf.Resource)
+
+	def _ParseGraphicsState(self, objidgen, tokens):
+		return self._StupidObjectParser(objidgen, tokens, _pdf.GraphicsState)
+
+
 
 	def _StupidObjectParser(self, objidgen, tokens, klass):
 		"""
@@ -481,6 +502,18 @@ class PDFTokenizer:
 					return self.GetContent(value)
 				else:
 					raise TypeError("Unrecognized type for Page.Contents: %s" % type(value))
+			elif key == 'Resources':
+				if isinstance(value, _pdf.Dictionary):
+					r = _pdf.Resource(self._DynamicLoader)
+					for k in value:
+						setattr(r, '_' + k, value[k])
+					return r
+				elif isinstance(value, _pdf.IndirectObject):
+					return self.GetResource(value)
+
+		elif klass == _pdf.Resource:
+			if isinstance(value, _pdf.Dictionary) or isinstance(value, _pdf.Array):
+				return value
 
 		raise NotImplementedError("Dynamic loader for class '%s' and key '%s' not implemented" % (klass.__name__, key))
 
@@ -511,6 +544,10 @@ class TokenHelpers:
 			return TokenHelpers.Convert_Dictionary(tok)
 		elif tok.type == 'stream':
 			return tok.value
+		elif tok.type == 'true':
+			return True
+		elif tok.type == 'false':
+			return False
 		else:
 			raise ValueError("Unknown token type '%s'" % tok.type)
 
