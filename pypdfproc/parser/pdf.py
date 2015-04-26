@@ -74,12 +74,12 @@ def t_COMMENT(t):
 # Import that this is before t_INT otherwise something like "13.0" will match t_INT before t_FLOAT and
 # result in (INT, 13) and (FLOAT, 0.0) by matching "13" and ".0" respectively
 def t_FLOAT(t):
-	r'\d*\.\d*'
+	r'[-+]?\d*\.\d*'
 	t.value = float(t.value)
 	return t
 
 def t_INT(t):
-	r'-?\d+'
+	r'[-+]?\d+'
 	t.value = int(t.value)
 	return t
 

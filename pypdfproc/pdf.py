@@ -234,6 +234,15 @@ class PDFHigherBase(PDFBase):
 	def _Load(self, key, rawvalue):
 		raise NotImplementedError("Class %s does not implement _Load function to dynamically load properties" % self.__class__.__name__)
 
+	def getsetprops(self):
+		ret = {}
+
+		for k in self.__dict__:
+			if k in self.__class__.__dict__:
+				ret[k] = self.__dict__[k]
+
+		return ret
+
 class Catalog(PDFHigherBase):
 	# Table 3.25 (pg 139-142) of 1.7 spec
 	_Type = None
@@ -423,4 +432,29 @@ class Font3(PDFHigherBase):
 class FontTrue(Font1):
 	# Same as Font1 with interpretive differences (5.5.2, pg 418)
 	pass
+
+class FontDescriptor(PDFHigherBase):
+	# Table 5.19 (pg 456-8) of 1.7 spec
+	_Type = None
+	_FontName = None
+	_FontFamily = None
+	_FontStretch = None
+	_FontWeight = None
+	_Flags = None
+	_FontBBox = None
+	_ItalicAngle = None
+	_Ascent = None
+	_Descent = None
+	_Leading = None
+	_CapHeight = None
+	_XHeight = None
+	_StemV = None
+	_StemH = None
+	_AvgWidth = None
+	_MaxWidth = None
+	_MissingWidth = None
+	_FontFile = None
+	_FontFile2 = None
+	_FontFile3 = None
+	_CharSet = None
 

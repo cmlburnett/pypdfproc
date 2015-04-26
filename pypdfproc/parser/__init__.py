@@ -394,6 +394,9 @@ class PDFTokenizer:
 	def GetFont(self, ind):
 		return self.GetObject(ind.objid, ind.generation, self._ParseFont)
 
+	def GetFontDescriptor(self, ind):
+		return self.GetObject(ind.objid, ind.generation, self._ParseFontDescriptor)
+
 
 
 	def _ParseInt(self, objidgen, tokens):
@@ -471,6 +474,9 @@ class PDFTokenizer:
 
 		return r
 
+	def _ParseFontDescriptor(self, objidgen, tokens):
+		return self._StupidObjectParser(objidgen, tokens, _pdf.FontDescriptor)
+
 
 
 	def _StupidObjectParser(self, objidgen, tokens, klass):
@@ -538,6 +544,14 @@ class PDFTokenizer:
 			if isinstance(value, _pdf.Dictionary) or isinstance(value, _pdf.Array):
 				return value
 
+		elif klass == _pdf.Font1 or klass == _pdf.FontTrue:
+			if key == 'FontDescriptor':
+				return self.GetFontDescriptor(value)
+
+		elif klass == _pdf.Font3:
+			if key == 'FontDescriptor':
+				return self.GetFontDescriptor(value)
+
 		raise NotImplementedError("Dynamic loader for class '%s' and key '%s' not implemented" % (klass.__name__, key))
 
 class TokenHelpers:
@@ -554,6 +568,8 @@ class TokenHelpers:
 			o = _pdf.Hexstring()
 			o.string = tok.value
 			return o
+		elif tok.type == 'LIT':
+			return tok.value
 		elif tok.type == 'INDIRECT':
 			o = _pdf.IndirectObject()
 			o.objid = tok.value[0]
@@ -571,7 +587,10 @@ class TokenHelpers:
 			return True
 		elif tok.type == 'false':
 			return False
+		elif tok.type == 'NULL':
+			return None
 		else:
+			print(tok.value)
 			raise ValueError("Unknown token type '%s'" % tok.type)
 
 	@staticmethod
