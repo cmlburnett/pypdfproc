@@ -550,6 +550,7 @@ def TokensPostfixToPrefix(tokens):
 			# c1 c2 c3 c4 SC	% if color space is currently CMYK
 			j = i-1
 			while j > 0:
+				print([j, tokens[j].type])
 				if tokens[j].type in ('INT', 'FLOAT'):
 					continue
 				else:
