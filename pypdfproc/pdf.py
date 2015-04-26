@@ -108,6 +108,10 @@ class Dictionary(PDFBase):
 class Array(PDFBase):
 	array = None
 
+	def __len__(self):				return len(self.array)
+	def __getitem__(self, k):		return self.array[k]
+	def __setitem__(self, k,v):		self.array[k] = v
+
 	def __repr__(self):				return str(self)
 	def __str__(self):				return "<%s %s>" % (self.__class__.__name__, str(self.array))
 
@@ -243,6 +247,29 @@ class PDFHigherBase(PDFBase):
 
 		return ret
 
+class PDFStreamBase(PDFBase):
+	Dict = None
+	StreamRaw = None
+
+	def __getattr__(self, k):
+		if k == 'Stream':
+			if 'Filter' in self.Dict:
+				if self.Dict['Filter'] == 'FlateDecode':
+					s = zlib.decompress(bytes(self.StreamRaw, 'latin-1'))
+					self.__dict__['Stream'] = s.decode('latin-1')
+				else:
+					raise ValueError("Unknown filter for content stream: %s" % self.Dict['Filter'])
+
+			else:
+				# No filtering
+				self.__dict__['Stream'] = self.StreamRaw
+
+			return self.__dict__['Stream']
+		else:
+			return self.__dict__[k]
+
+# ------------------------------------------------------------------------------
+
 class Catalog(PDFHigherBase):
 	# Table 3.25 (pg 139-142) of 1.7 spec
 	_Type = None
@@ -361,26 +388,8 @@ class NumberTreeNode(PDFHigherBase):
 
 		return ret
 
-class Content(PDFBase):
-	Dict = None
-	StreamRaw = None
-
-	def __getattr__(self, k):
-		if k == 'Stream':
-			if 'Filter' in self.Dict:
-				if self.Dict['Filter'] == 'FlateDecode':
-					s = zlib.decompress(bytes(self.StreamRaw, 'latin-1'))
-					self.__dict__['Stream'] = s.decode('latin-1')
-				else:
-					raise ValueError("Unknown filter for content stream: %s" % self.Dict['Filter'])
-
-			else:
-				# No filtering
-				self.__dict__['Stream'] = self.StreamRaw
-
-			return self.__dict__['Stream']
-		else:
-			return self.__dict__[k]
+class Content(PDFStreamBase):
+	pass
 
 class Resource(PDFHigherBase):
 	# Table 3.30 (pg 154) of 1.7 spec
@@ -495,7 +504,16 @@ class Font3(PDFHigherBase):
 
 class FontTrue(Font1):
 	# Same as Font1 with interpretive differences (5.5.2, pg 418)
-	pass
+	_Type = None
+	_Subtype = None
+	_Name = None
+	_BaseFont = None
+	_FirstChar = None
+	_LastChar = None
+	_Widths = None
+	_FontDescriptor = None
+	_Encoding = None
+	_ToUnicode = None
 
 class FontDescriptor(PDFHigherBase):
 	# Table 5.19 (pg 456-8) of 1.7 spec
@@ -521,6 +539,15 @@ class FontDescriptor(PDFHigherBase):
 	_FontFile2 = None
 	_FontFile3 = None
 	_CharSet = None
+
+class FontEncoding(PDFHigherBase):
+	# Table 5.11 (pg 427) of 1.7 spec
+	_Type = None
+	_BaseEncoding = None
+	_Differences = None
+
+class FontToUnicode(PDFStreamBase):
+	pass
 
 class XObject(PDFHigherBase):
 	# Table ???

@@ -405,10 +405,27 @@ class PDFTokenizer:
 	def GetFontDescriptor(self, ind):
 		return self.GetObject(ind.objid, ind.generation, self._ParseFontDescriptor)
 
+	def GetFontEncoding(self, ind):
+		return self.GetObject(ind.objid, ind.generation, self._ParseFontEncoding)
+
+	def GetFontToUnicode(self, ind):
+		return self.GetObject(ind.objid, ind.generation, self._ParseFontToUnicode)
+
 	def GetXObject(self, ind):
 		return self.GetObject(ind.objid, ind.generation, self._ParseXObject)
 
 
+
+
+	def _ParseStream(self, objidgen, tokens):
+		d = TokenHelpers.Convert(tokens[0].value[2][0])
+		s = TokenHelpers.Convert(tokens[0].value[2][1])
+
+		r = _pdf.Content()
+		r.Dict = d
+		r.StreamRaw = s
+
+		return r
 
 	def _ParseInt(self, objidgen, tokens):
 		# Example
@@ -435,14 +452,7 @@ class PDFTokenizer:
 		return self._StupidObjectParser(objidgen, tokens, _pdf.NumberTreeNode)
 
 	def _ParseContent(self, objidgen, tokens):
-		d = TokenHelpers.Convert(tokens[0].value[2][0])
-		s = TokenHelpers.Convert(tokens[0].value[2][1])
-
-		r = _pdf.Content()
-		r.Dict = d
-		r.StreamRaw = s
-
-		return r
+		return self._ParseStream(objidgen, tokens)
 
 	def _ParserPageTreeNodeOrPageOject(self, objidgen, tokens):
 		"""
@@ -511,6 +521,12 @@ class PDFTokenizer:
 
 	def _ParseFontDescriptor(self, objidgen, tokens):
 		return self._StupidObjectParser(objidgen, tokens, _pdf.FontDescriptor)
+
+	def _ParseFontEncoding(self, objidgen, tokens):
+		return self._StupidObjectParser(objidgen, tokens, _pdf.FontEncoding)
+
+	def _ParseFontToUnicode(self, objidgen, tokens):
+		return self._ParseStream(objidgen, tokens)
 
 	def _ParseXObject(self, objidgen, tokens):
 		"""
@@ -613,12 +629,28 @@ class PDFTokenizer:
 				return value
 
 		elif klass == _pdf.Font1 or klass == _pdf.FontTrue:
-			if key == 'FontDescriptor':
-				return self.GetFontDescriptor(value)
+			# Some of these may well be indirects but otherwise just return the value
+			if isinstance(value, _pdf.IndirectObject):
+				if key == 'FontDescriptor':
+					return self.GetFontDescriptor(value)
+				elif key == 'Encoding':
+					return self.GetFontEncoding(value)
+				elif key == 'ToUnicode':
+					return self.GetFontToUnicode(value)
+				else:
+					pass
+			else:
+				return value
 
 		elif klass == _pdf.Font3:
 			if key == 'FontDescriptor':
 				return self.GetFontDescriptor(value)
+
+		elif klass == _pdf.FontEncoding:
+			if isinstance(value, _pdf.IndirectObject):
+				pass
+			else:
+				return value
 
 		raise NotImplementedError("Dynamic loader for class '%s' and key '%s' not implemented" % (klass.__name__, key))
 

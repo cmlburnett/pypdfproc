@@ -133,7 +133,7 @@ t_Tk =		r'Tk' # Knockout (5.2.7)
 
 t_Td =		r'Td' # Text positioning (5.3.1; pg 406)
 t_TD =		r'TD' # Text positioning (5.3.1; pg 406)
-t_Tm =		r'Tm'
+t_Tm =		r'Tm' # Text transformation matrix (5.3.1; pg 406)
 
 t_Tstar =	r'T\*' # Text showing operations (5.3.2)
 t_TstarTj =	r'\''  # Text showing operations (5.3.2)
@@ -236,11 +236,12 @@ t_ignore = ''
 lexer = plylex.lex()
 
 class PDFToken(object):
-	def __init__(self, type, value, lineno, lexpos):
+	def __init__(self, type, value, lineno, lexpos, page=None):
 		self.type = type
 		self.value = value
 		self.lineno = lineno
 		self.lexpos = lexpos
+		self.page = page
 
 	@staticmethod
 	def FromLexToken(tok):
