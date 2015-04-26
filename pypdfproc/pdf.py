@@ -458,3 +458,51 @@ class FontDescriptor(PDFHigherBase):
 	_FontFile3 = None
 	_CharSet = None
 
+class XObject(PDFHigherBase):
+	# Table ???
+	_Type = None
+	_Subtype = None
+
+
+class XObjectForm(PDFHigherBase):
+	# Table 4.45 (pg 358-60) of 1.7 spec
+	_Type = None
+	_Subtype = None
+	_FormType = None
+	_BBox = None
+	_Matrix = None
+	_Resources = None
+	_Group = None
+	_Ref = None
+	_Metadata = None
+	_PieceInfo = None
+	_LastModified = None
+	_StructParent = None
+	_StructParents = None
+	_OPI = None
+	_OC = None
+	_Name = None
+
+class XObjectImage(PDFHigherBase):
+	# Table 4.39 (pg 340-3) of 1.7 spec
+	_Type = None
+	_Subtype = None
+	_Width = None
+	_Height = None
+	_ColorSpace = None
+	_BitsPerComponent = None
+	_Intent = None
+	_ImageMask = None
+	_Mask = None
+	_Decode = None
+	_Interpolate = None
+	_Alternates = None
+	_SMask = None
+	_SMaskInData = None
+	_Name = None
+	_SructParent = None
+	_ID = None
+	_OPI = None
+	_Metadata = None
+	_OC = None
+

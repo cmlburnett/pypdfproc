@@ -397,6 +397,9 @@ class PDFTokenizer:
 	def GetFontDescriptor(self, ind):
 		return self.GetObject(ind.objid, ind.generation, self._ParseFontDescriptor)
 
+	def GetXObject(self, ind):
+		return self.GetObject(ind.objid, ind.generation, self._ParseXObject)
+
 
 
 	def _ParseInt(self, objidgen, tokens):
@@ -467,7 +470,7 @@ class PDFTokenizer:
 		elif styp == 'Type3':		r = _pdf.Font3(self._DynamicLoader)
 		elif styp == 'TrueType':	r = _pdf.FontTrue(self._DynamicLoader)
 		else:
-			raise ValueError("Unrecognized object type (%s) for this function: neither Type1 or Type3" % styp)
+			raise ValueError("Unrecognized object type (%s) for this function: neither Type1,  Type3, or TrueType" % styp)
 
 		for k in o[0]:
 			setattr(r, '_' + k, o[0][k])
@@ -476,6 +479,26 @@ class PDFTokenizer:
 
 	def _ParseFontDescriptor(self, objidgen, tokens):
 		return self._StupidObjectParser(objidgen, tokens, _pdf.FontDescriptor)
+
+	def _ParseXObject(self, objidgen, tokens):
+		"""
+		Several subtypes of XObject, must switch depending on Subtype.
+		"""
+
+		o = TokenHelpers.Convert(tokens[0].value[2])
+		if 'Type' in o[0]:			typ = o[0]['Type']
+		else:						typ = 'XObject'
+		styp = o[0]['Subtype']
+
+		if styp == 'Form':			r = _pdf.XObjectForm(self._DynamicLoader)
+		elif styp == 'Image':		r = _pdf.XObjectImage(self._DynamicLoader)
+		else:
+			raise ValueError("Unrecognized object type (%s) for this function: neither Form or Image" % styp)
+
+		for k in o[0]:
+			setattr(r, '_' + k, o[0][k])
+
+		return r
 
 
 
