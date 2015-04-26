@@ -388,6 +388,9 @@ class PDFTokenizer:
 	def GetResource(self, ind):
 		return self.GetObject(ind.objid, ind.generation, self._ParseResource)
 
+	def GetColorSpace(self, ind):
+		return self.GetObject(ind.objid, ind.generation, self._ParseColorSpace)
+
 	def GetGraphicsState(self, ind):
 		return self.GetObject(ind.objid, ind.generation, self._ParseGraphicsState)
 
@@ -453,6 +456,24 @@ class PDFTokenizer:
 
 	def _ParseResource(self, objidgen, tokens):
 		return self._StupidObjectParser(objidgen, tokens, _pdf.Resource)
+
+	def _ParserColorSpace(self, objidgen, tokens):
+		"""
+		Several subtypes of ColorSpace, must switch depending on Subtype
+		"""
+
+		o = TokenHelpers.Convert(tokens[0].value[2])
+		typ = o[0]['Type']
+
+		if styp == 'CalGray':	r = _pdf.ColorSpaceGray(self._DynamicLoader)
+		elif styp == 'CalRGB':	r = _pdf.ColorSpaceRGB(self._DynamicLoader)
+		else:
+			raise ValueError("Unrecognized object subtype (%s) for this type ColorSpace" % styp)
+
+		for k in o[0]:
+			setattr(r, '_' + k, o[0][k])
+
+		return r
 
 	def _ParseGraphicsState(self, objidgen, tokens):
 		return self._StupidObjectParser(objidgen, tokens, _pdf.GraphicsState)

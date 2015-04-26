@@ -370,6 +370,47 @@ class Resource(PDFHigherBase):
 	_ProcSet = None
 	_Properties = None
 
+class ColorSpaceGray(PDFHigherBase):
+	# Table 4.13 (pg 246) of 1.7 spec
+	_Type = None
+	_Subtype = None
+	_WhitePoint = None
+	_BlackPoint = None
+	_Gamma = None
+
+class ColorSpaceRGB(PDFHigherBase):
+	# Table 4.14 (pg 248) of 1.7 spec
+	_Type = none
+	_Subtype = None
+	_WhitePoint = None
+	_BlackPoint = None
+	_Gamma = None
+	_Matrix = None
+
+class ColorSpaceLab(PDFHigherBase):
+	# Table 4.13 (pg 246) of 1.7 spec
+	_Type = None
+	_Subtype = None
+	_WhitePoint = None
+	_BlackPoint = None
+	_Range = None
+
+class ColorSpaceICC(PDFHigherBase):
+	# Table 4.16 (pg 253) of 1.7 spec
+	_Type = None
+	_Subtype = None
+	_N = None
+	_Alternate = None
+	_Range = None
+	_Metadata = None
+
+class ColorSpaceDeviceN(PDFHigherBase):
+	# Table 4.21 (pg 272) of 1.7 spec
+	_Type = None
+	_Colorants = None
+	_Process = None
+	_MixingHints = None
+
 class GraphicsState(PDFHigherBase):
 	# Table 4.8 (pg 220-3) of 1.7 spec
 	_Type = None
