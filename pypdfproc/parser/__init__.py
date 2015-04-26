@@ -289,7 +289,7 @@ class PDFTokenizer:
 				# Converted
 				# [<Dictionary {'Length': 1070, 'Filter': 'FlateDecode'}>]
 				#
-				# So, etoks[0] is the OBJECT toekn and etoks[0].value[2] is the DICT token
+				# So, etoks[0] is the OBJECT token and etoks[0].value[2] is the DICT token
 				# and d[0] is the dictionary after converting
 
 				# Consolidate
