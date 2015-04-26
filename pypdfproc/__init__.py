@@ -196,6 +196,11 @@ diffmap['nine'] = '9'
 diffmap['zero'] = '0'
 
 def MapCharacter(f, enc, cmap, c):
+	"""
+	This has the challenging task of converting a PDF character code to a unicode character.
+	Not trivial...
+	"""
+
 	if isinstance(enc, _pdf.FontEncoding):
 		if enc.Differences:
 			if ord(c) > len(enc.Differences):
@@ -207,17 +212,21 @@ def MapCharacter(f, enc, cmap, c):
 			else:
 				return ec
 	else:
-		# No mapping
+		# No mapping: PDF character code is equivalent to unicode character (neat)
 		return c
 
 def SplitLiteral(lit):
+	"""
+	Split a literal string up by character by accounting for escape sequences.
+	"""
+
 	ret = []
 
 	imax = len(lit)
 	i = 0
 	while i < imax:
 		if lit[i] == '\\':
-			# Ignore the backslash
+			# Ignore the backslash (I think this is the correct interpretation
 			if lit[i+1] in ('\n', '\r', '\t', '\b', '\f'):
 				ret.append(lit[i+1])
 				i += 2
@@ -263,6 +272,4 @@ def SplitLiteral(lit):
 			i += 1
 
 	return ret
-
-
 
