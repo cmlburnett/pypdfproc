@@ -391,6 +391,9 @@ class PDFTokenizer:
 	def GetGraphicsState(self, ind):
 		return self.GetObject(ind.objid, ind.generation, self._ParseGraphicsState)
 
+	def GetFont(self, ind):
+		return self.GetObject(ind.objid, ind.generation, self._ParseFont)
+
 
 
 	def _ParseInt(self, objidgen, tokens):
@@ -435,7 +438,7 @@ class PDFTokenizer:
 		if typ == 'Pages':		r = _pdf.PageTreeNode(self._DynamicLoader)
 		elif typ == 'Page':		r = _pdf.Page(self._DynamicLoader)
 		else:
-			raise ValueError("Unrecognized object type (%s)for this function: neither Pages nor Page" % typ)
+			raise ValueError("Unrecognized object type (%s) for this function: neither Pages nor Page" % typ)
 
 		for k in o[0]:
 			setattr(r, '_' + k, o[0][k])
@@ -447,6 +450,26 @@ class PDFTokenizer:
 
 	def _ParseGraphicsState(self, objidgen, tokens):
 		return self._StupidObjectParser(objidgen, tokens, _pdf.GraphicsState)
+
+	def _ParseFont(self, objidgen, tokens):
+		"""
+		Several subtypes of Font, must switch depending on Subtype
+		"""
+
+		o = TokenHelpers.Convert(tokens[0].value[2])
+		typ = o[0]['Type']
+		styp = o[0]['Subtype']
+
+		if styp == 'Type1':			r = _pdf.Font1(self._DynamicLoader)
+		elif styp == 'Type3':		r = _pdf.Font3(self._DynamicLoader)
+		elif styp == 'TrueType':	r = _pdf.FontTrue(self._DynamicLoader)
+		else:
+			raise ValueError("Unrecognized object type (%s) for this function: neither Type1 or Type3" % styp)
+
+		for k in o[0]:
+			setattr(r, '_' + k, o[0][k])
+
+		return r
 
 
 

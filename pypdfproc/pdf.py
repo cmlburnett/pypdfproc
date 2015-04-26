@@ -391,3 +391,36 @@ class GraphicsState(PDFHigherBase):
 	_AIS = None
 	_TK = None
 
+class Font1(PDFHigherBase):
+	# Table 5.8 (pg 413-5) of 1.7 spec
+	_Type = None
+	_Subtype = None
+	_Name = None
+	_BaseFont = None
+	_FirstChar = None
+	_LastChar = None
+	_Widths = None
+	_FontDescriptor = None
+	_Encoding = None
+	_ToUnicode = None
+
+class Font3(PDFHigherBase):
+	# Table 5.9 (page 420-1) of 1.7 spec
+	_Type = None
+	_Subtype = None
+	_Name = None
+	_FontBBox = None
+	_FontMatrix = None
+	_CharProcs = None
+	_Encoding = None
+	_FirstChar = None
+	_LastChar = None
+	_Widths = None
+	_FontDescriptor = None
+	_Resources = None
+	_ToUnicode = None
+
+class FontTrue(Font1):
+	# Same as Font1 with interpretive differences (5.5.2, pg 418)
+	pass
+
