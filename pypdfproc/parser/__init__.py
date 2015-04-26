@@ -1,6 +1,8 @@
 import os
 
 from . import pdf as pdfloc
+from . import text as textloc
+from . import cmap as cmaploc
 
 from .. import pdf as _pdf
 
@@ -83,9 +85,9 @@ class PDFTokenizer:
 	pdf = None
 
 	def __init__(self, file):
-		if not hasattr(file, 'read'):		raise TypeError('PDF object has no read() method')
-		if not hasattr(file, 'seek'):		raise TypeError('PDF object has no seek() method')
-		if not hasattr(file, 'tell'):		raise TypeError('PDF object has no tell() method')
+		if not hasattr(file, 'read'):		raise TypeError('PDF file object has no read() method')
+		if not hasattr(file, 'seek'):		raise TypeError('PDF file object has no seek() method')
+		if not hasattr(file, 'tell'):		raise TypeError('PDF file object has no tell() method')
 
 		self.file = file
 		self.pdf = None
@@ -619,6 +621,98 @@ class PDFTokenizer:
 				return self.GetFontDescriptor(value)
 
 		raise NotImplementedError("Dynamic loader for class '%s' and key '%s' not implemented" % (klass.__name__, key))
+
+
+class TextTokenizer:
+	"""
+	Tokenizer for text streams.
+	"""
+
+	# File object, IOStream object, whatever as long as it meets basic read/seek/tell functionality
+	file = None
+
+	# PDF object (i.e., _pdf.PDF); must keep a copy so other functions can build upon it as needed
+	pdf = None
+
+	def __init__(self, file, pdf):
+		if not hasattr(file, 'read'):		raise TypeError('PDF file object has no read() method')
+		if not hasattr(file, 'seek'):		raise TypeError('PDF file object has no seek() method')
+		if not hasattr(file, 'tell'):		raise TypeError('PDF file object has no tell() method')
+
+		self.file = file
+		self.pdf = pdf
+
+	def TokenizeString(self, txt):
+		return textloc.TokenizeString(txt)
+
+	def TokensToText(self, tokens, page):
+		ret = []
+
+		state = {}
+		state['font'] = {}
+
+		print('=================')
+		for i in range(len(tokens)):
+			tok = tokens[i]
+			print(tok)
+
+			if tok.type == 'Tf':
+				f = state['font']['font'] = tok.value[0].value
+				s = state['font']['size'] = tok.value[1].value
+				fo = state['font']['obj'] = page.ResourcesOBJS['Font'][f]
+				fd = fo.FontDescriptorOBJ
+
+				# Pull out object stuff
+				fbase = fo.BaseFont
+				fchar = fo.FirstChar
+				lchar = fo.LastChar
+				widths = fo.Widths
+				enc = fo.Encoding
+				touni = fo.ToUnicode
+				charset = fd.CharSetARR
+				fname = fd.FontName
+				ffile = fd.FontFile3
+
+				if fo.EncodingOBJ:
+					enc = fo.EncodingOBJ
+				if fo.ToUnicode:
+					touni = fo.ToUnicodeOBJ
+
+				print()
+				print(['Tf font', f, s, fchar, lchar, enc, touni, charset, fbase, fname, ffile])
+
+				if touni:
+					cmaploc.cmaptxt = fo.ToUnicodeOBJ.InterpretStream()
+
+					cmapint = cmaploc.pdfcmap()
+					cmaptokens = cmapint.TokenizeString(cmaptxt)
+					for cmpi in range(len(cmaptokens)):
+						cmptok = cmaptokens[cmpi]
+						print(cmptok)
+
+			elif tok.type == 'Tj':
+				ret.append(tok.value[0].value)
+			elif tok.type == 'TJ':
+				subret = ""
+				for v in tok.value:
+					if v.type == "LIT":
+						subret += v.value
+					elif v.type == "INT":
+						# If longer than a threshold, assume it's a space
+						# TODO: use FontDescription some how
+						if abs(v.value) > 150:
+							subret += " "
+						else:
+							pass
+
+				ret.append(subret)
+
+
+		print(ret)
+		print("\n".join(ret))
+
+		return " ".join(ret)
+
 
 class TokenHelpers:
 	@staticmethod

@@ -43,6 +43,7 @@ data_files = [
 							'pypdfproc/parser/__init__.py',
 							'pypdfproc/parser/pdf.py',
 							'pypdfproc/parser/text.py',
+							'pypdfproc/parser/cmap.py',
 	]),
 ]
 scripts = []
