@@ -457,13 +457,16 @@ class PDFTokenizer:
 	def _ParseResource(self, objidgen, tokens):
 		return self._StupidObjectParser(objidgen, tokens, _pdf.Resource)
 
-	def _ParserColorSpace(self, objidgen, tokens):
+	def _ParseColorSpace(self, objidgen, tokens):
 		"""
 		Several subtypes of ColorSpace, must switch depending on Subtype
 		"""
 
+		raise NotImplementedError()
+		print(tokens)
 		o = TokenHelpers.Convert(tokens[0].value[2])
-		typ = o[0]['Type']
+		print(o)
+		typ = o[0]['Subtype']
 
 		if styp == 'CalGray':	r = _pdf.ColorSpaceGray(self._DynamicLoader)
 		elif styp == 'CalRGB':	r = _pdf.ColorSpaceRGB(self._DynamicLoader)

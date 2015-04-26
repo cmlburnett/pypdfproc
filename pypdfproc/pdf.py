@@ -380,7 +380,7 @@ class ColorSpaceGray(PDFHigherBase):
 
 class ColorSpaceRGB(PDFHigherBase):
 	# Table 4.14 (pg 248) of 1.7 spec
-	_Type = none
+	_Type = None
 	_Subtype = None
 	_WhitePoint = None
 	_BlackPoint = None
