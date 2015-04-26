@@ -301,7 +301,7 @@ class PDFTokenizer:
 				# Otherwise if it's an integer then nothing else needs to be done
 				if isinstance(dlen, _pdf.IndirectObject):
 					streamlength = self.LoadObject(dlen.objid, dlen.generation, self._ParseInt)
-				if type(dlen) == int:
+				elif type(dlen) == int:
 					streamlength = dlen
 				else:
 					raise TypeError("Unknown type for stream length: %s" % dlen)
