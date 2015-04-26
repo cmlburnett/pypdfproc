@@ -63,5 +63,6 @@ class PDF:
 		tt = parser.TextTokenizer(self.f, self.p)
 
 		toks = tt.TokenizeString(content)
+		toks = toks['tokens']
 		return toks
 
