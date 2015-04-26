@@ -382,6 +382,9 @@ class PDFTokenizer:
 	def GetPage(self, ind):
 		return self.GetObject(ind.objid, ind.generation, self._ParsePage)
 
+	def GetNumberTreeNode(self, ind):
+		return self.GetObject(ind.objid, ind.generation, self._ParseNumberTreeNode)
+
 	def GetContent(self, ind):
 		return self.GetObject(ind.objid, ind.generation, self._ParseContent)
 
@@ -425,6 +428,9 @@ class PDFTokenizer:
 
 	def _ParsePage(self, objidgen, tokens):
 		return self._StupidObjectParser(objidgen, tokens, _pdf.Page)
+
+	def _ParseNumberTreeNode(self, objidgen, tokens):
+		return self._StupidObjectParser(objidgen, tokens, _pdf.NumberTreeNode)
 
 	def _ParseContent(self, objidgen, tokens):
 		d = TokenHelpers.Convert(tokens[0].value[2][0])
@@ -551,6 +557,8 @@ class PDFTokenizer:
 			if key == 'Pages':
 				# Catalog.Pages is a PageTreeNode
 				return self.GetPageTreeNode(value)
+			elif key == 'PageLabels':
+				return self.GetNumberTreeNode(value)
 
 		elif klass == _pdf.PageTreeNode:
 			if key == 'Kids':
@@ -586,6 +594,17 @@ class PDFTokenizer:
 					return r
 				elif isinstance(value, _pdf.IndirectObject):
 					return self.GetResource(value)
+
+		elif klass == _pdf.NumberTreeNode:
+			if key == 'Nums':
+				ret = []
+				for i in range(0, len(value.array), 2):
+					ret.append( tuple(value.array[i:i+2]) )
+				print(ret)
+				raise NotImplementedError()
+
+				return [self.GetNumberTreeNode(v) for v in value.array]
+
 
 		elif klass == _pdf.Resource:
 			if isinstance(value, _pdf.Dictionary) or isinstance(value, _pdf.Array):

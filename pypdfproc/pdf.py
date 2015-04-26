@@ -338,6 +338,29 @@ class Page(PDFHigherBase):
 	def __repr__(self):				return str(self)
 	def __str__(self):				return "<%s %x parent=%x>" % (self.__class__.__name__, id(self), id(self.Parent))
 
+class NumberTreeNode(PDFHigherBase):
+	# Table 3.34 (pg 166) of 1.7 spec
+	_Type = None
+	_Kids = None
+	_Nums = None
+	_Limits = None
+
+	def DFSPageLabels(self):
+		"""
+		Do a depth-first search for NumberTreeNode objects.
+		This returns all NumberTreeNode leaf nodes in the order that they should be displayed.
+		"""
+
+		ret = []
+
+		if self.Kids:
+			for k in self.Kids:
+				ret = ret + self.DFSPages(k)
+		else:
+			return self.Nums
+
+		return ret
+
 class Content(PDFBase):
 	Dict = None
 	StreamRaw = None
