@@ -21,19 +21,24 @@ class PDF:
 	# PDF parser
 	p = None
 
-
 	def __init__(self, fname):
 		self.fname = fname
 
+		# Open file and mmap it
 		self.f = open(fname, 'rb')
 		self.m = mmap.mmap(self.f.fileno(), 0, prot=mmap.PROT_READ)
 
+		# Open the file and initialize it (xref/trailer reading)
 		self.p = parser.PDFTokenizer(self.m)
 		self.p.Initialize()
 
 	def Close(self):
 		self.m.close()
 		self.f.close()
+
+		self.m = None
+		self.f = None
+		self.p = None
 
 	def GetRootObject(self):
 		return self.p.GetRootObject()
@@ -53,7 +58,7 @@ class PDF:
 			else:
 				contents.append(cts.Stream)
 
-		content = "\n".join(contents)
+		content = " ".join(contents)
 
 		tt = parser.TextTokenizer(self.f, self.p)
 

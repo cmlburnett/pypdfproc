@@ -316,10 +316,6 @@ def TokenizeString(txt, residual=None):
 def TokensPostfixToPrefix(tokens):
 	ret = []
 
-	for i in range(len(tokens)):
-		t = tokens[i]
-		#print([i, t])
-
 	lastidx = -1
 	for i in range(len(tokens)):
 		t = tokens[i]
@@ -550,10 +546,10 @@ def TokensPostfixToPrefix(tokens):
 			# c1 c2 c3 c4 SC	% if color space is currently CMYK
 			j = i-1
 			while j > 0:
-				print([j, tokens[j].type])
 				if tokens[j].type in ('INT', 'FLOAT'):
-					continue
+					j -= 1
 				else:
+					j += 1
 					break
 
 			ret.append( PDFToken(t.type, tuple(PDFToken.FromLexToken(tokens[j:i])), tokens[j].lineno, tokens[j].lexpos) )
@@ -577,8 +573,9 @@ def TokensPostfixToPrefix(tokens):
 			j = i-1
 			while j > 0:
 				if tokens[j].type in ('INT', 'FLOAT', 'LIT'):
-					continue
+					j -= 1
 				else:
+					j += 1
 					break
 
 			ret.append( PDFToken(t.type, tuple(PDFToken.FromLexToken(tokens[j:i])), tokens[j].lineno, tokens[j].lexpos) )
