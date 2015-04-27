@@ -16,6 +16,10 @@ def isindirect(o):
 	return isinstance(o, _pdf.IndirectObject)
 
 class PDF:
+	"""
+	Basic entry point into manipulating PDF files.
+	"""
+
 	# File name, file object, and mmap object
 	fname = None
 	f = None
@@ -169,6 +173,28 @@ class PDF:
 					pass
 
 		return "".join(txt)
+
+	def GetPageThumbnail(self, page):
+		if type(page) == int:
+			root = self.GetRootObject()
+			pages = root.Pages.DFSPages()
+
+			if page < 1:				raise ValueError("Page number (%d) must be a positive number" % page)
+			if page > len(pages):		raise ValueError("Page number (%d) is larger the total number of pages" % page)
+
+			# Get page (pages is zero-based and pagenum is one-based, so subtract one)
+			page = pages[page-1]
+
+		elif isinstance(page, _pdf.Page):
+			# Page supplied, nothing to get
+			pass
+
+		else:
+			raise TypeError("Unrecognized page type passed: %s" % page)
+
+		t = page.Thumb
+		raise NotImplementedError()
+
 
 # FIXME: not the way to do this I don't think
 diffmap = {}
