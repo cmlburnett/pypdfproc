@@ -125,6 +125,7 @@ class PDF:
 			for tok in toks:
 				# Font information (needs to be tracked until it changes)
 				if tok.type == 'Tf':
+					#print(['tok', tok])
 					font['name'] = tok.value[0].value
 					font['size'] = tok.value[1].value
 
@@ -139,33 +140,56 @@ class PDF:
 					#print('Last char: %d' % f.LastChar)
 					#print([f, fd, enc, cmap])
 					#print(f.getsetprops())
+
+					w = f.Widths.array
+					w = [_ for _ in w if _>0]
+					avg = (sum(w))/len(w)
+					font['sizes'] = {'min': min(w), 'avg': avg, 'max': max(w)}
+					#print(['w', w, min(w), avg, max(w)])
 					#print(fd.getsetprops())
-					#print(enc.getsetprops())
+					#if type(enc) != str:
+					#	print(enc.getsetprops())
 					#print(cmap.Stream)
 
 				# Token value is a single literal of text
 				elif tok.type == 'Tj':
+					#print(['tok', tok])
 					l = tok.value[0].value
 
+					#print(['l', l])
 					ret = SplitLiteral(l)
+					#print(ret)
 					ret = [MapCharacter(f, enc, cmap, c) for c in ret]
+					#print(ret)
 					txt += ret
+
+					txt += ' '
 
 				# Token is an array of literal and inter-character spacing integers
 				elif tok.type == 'TJ':
+					#print(['tok', tok])
 					v = tok.value
 					for part in v:
 						if part.type == 'LIT':
 							ret = SplitLiteral(part.value)
 							ret = [MapCharacter(f, enc, cmap, c) for c in ret]
+							#print(ret)
 							txt += ret
-						elif part.type == 'INT':
+						elif part.type in ('INT', 'FLOAT'):
 							# FIXME: may have to content with inter-character spacing used for space characters...
 							# For now just ignore
-							pass
+							#print(part)
+
+							# Somewhat of a fix for the above mentioned space issue
+							# This heuristically assumes that any inter-word spacing that's greater than 50% of
+							# the average character width is a space
+							if abs(part.value) > 0.5*font['sizes']['avg']:
+								txt += ' '
+
 						else:
 							raise TypeError("Unrecognize type in TJ array: %s" % part.type)
-					pass
+
+					txt += ' '
 
 				# Don't care about anything else
 				# NB: possible that state is pushed and poped (Q and q) that changes the current font information, but that's more advanced for now
@@ -228,15 +252,38 @@ def MapCharacter(f, enc, cmap, c):
 	"""
 
 	if isinstance(enc, _pdf.FontEncoding):
+		if cmap:
+			ct = parser.CMapTokenizer()
+			m = ct.BuildMapper(cmap.Stream)
+
+			try:
+				ret = m(c)
+				if type(ret) == int:
+					raise TypeError("Should return char for '%s' (ord %d) but got integer %d" % (c, ord(c), ret))
+				return ret
+
+			except KeyError:
+				# Not in CMap, so try the differences array
+				pass
+
 		if enc.Differences:
-			if ord(c) > len(enc.Differences):
+			m = DifferencesArrayToMap(enc.Differences)
+			#print(['enc', enc.getsetprops()])
+			#print(m)
+
+			if ord(c) not in m:
 				raise KeyError("Cannot map character (ord %d) in differences array with length %d" % (ord(c), len(enc.Differences)))
-			ec = enc.Differences[ord(c)]
+
+			ec = m[ord(c)]
 
 			if ec in diffmap:
-				return diffmap[ec]
+				ret = diffmap[ec]
 			else:
-				return ec
+				ret = ec
+
+			if type(ret) == int:
+				raise TypeError("Should return char for '%s' but got integer %d" % (c, ret))
+			return ret
 	else:
 		# No mapping: PDF character code is equivalent to unicode character (neat)
 		return c
@@ -298,4 +345,17 @@ def SplitLiteral(lit):
 			i += 1
 
 	return ret
+
+def DifferencesArrayToMap(arr):
+	mapdat = {}
+
+	lastcode = 0
+	for item in arr:
+		if type(item) == int:
+			lastcode = item
+		else:
+			mapdat[ lastcode ] = item
+			lastcode += 1
+
+	return mapdat
 

@@ -113,57 +113,50 @@ t_ignore = ''
 # Initiate lexer
 lexer = plylex.lex()
 
-class pdfcmap:
-	def __init__(self):
-		pass
+def TokenizeString(txt):
+	lexer.input(txt)
 
-	def TokenizeString(self, txt):
-		lexer.input(txt)
+	tokens = []
+	tokcnt = 0
 
-		tokens = []
-		tokcnt = 0
+	# Parse text stream into tokens
+	while True:
+		tok = lexer.token()
+		if not tok:
+			break
 
-		# Parse text stream into tokens
-		while True:
-			tok = lexer.token()
-			if not tok:
-				break
+		# Special handling by yanking out literal text because balanced parenthesis is hard in regex
+		if tok.type == 'LIT_START':
+			cnt = 1
 
-			# Special handling by yanking out literal text because balanced parenthesis is hard in regex
-			if tok.type == 'LIT_START':
-				cnt = 1
+			# Keep track so to know indices of literal string
+			startpos = lexer.lexpos
 
-				# Keep track so to know indices of literal string
-				startpos = lexer.lexpos
+			while cnt>0:
+				if lexer.lexdata[lexer.lexpos] == '(' and lexer.lexdata[lexer.lexpos-1] != '\\':
+					cnt += 1
+				elif lexer.lexdata[lexer.lexpos] == ')' and lexer.lexdata[lexer.lexpos-1] != '\\':
+					cnt -= 1
 
-				while cnt>0:
-					if lexer.lexdata[lexer.lexpos] == '(' and lexer.lexdata[lexer.lexpos-1] != '\\':
-						cnt += 1
-					elif lexer.lexdata[lexer.lexpos] == ')' and lexer.lexdata[lexer.lexpos-1] != '\\':
-						cnt -= 1
+				# Make a step
+				lexer.lexpos += 1
 
-					# Make a step
-					lexer.lexpos += 1
+			# Save some typing
+			endpos = lexer.lexpos
 
-				# Save some typing
-				endpos = lexer.lexpos
+			# Yank out literal data excluding the last byte since that is the LIT_END
+			tok.type = 'LIT'
+			tok.value = lexer.lexdata[startpos:(endpos-1)]
 
-				# Yank out literal data excluding the last byte since that is the LIT_END
-				tok.type = 'LIT'
-				tok.value = lexer.lexdata[startpos:(endpos-1)]
+			# Strip out escaped parentheses
+			tok.value = tok.value.replace("\\(", "(").replace("\\)", ")")
 
-				# Strip out escaped parentheses
-				tok.value = tok.value.replace("\\(", "(").replace("\\)", ")")
+			# SCRATCH THIS: SKIP THE LIT_END TOKEN COMPLETELY
+			# Go back a space so the lexer pulls out the LIT_END token
+			#lexer.lexpos -= 1
 
-				# SCRATCH THIS: SKIP THE LIT_END TOKEN COMPLETELY
-				# Go back a space so the lexer pulls out the LIT_END token
-				#lexer.lexpos -= 1
+		tokcnt += 1
+		tokens.append(tok)
 
-			tokcnt += 1
-			tokens.append(tok)
-
-		return tokens
-
-	def BuildMapper(self, tokens):
-		return None
+	return tokens
 

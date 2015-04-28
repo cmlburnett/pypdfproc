@@ -375,6 +375,9 @@ class PDFTokenizer:
 
 		return self.GetObject(ind.objid, ind.generation, self._ParseCatalog)
 
+	def GetDictionary(self, ind):
+		return self.GetObject(ind.objid, ind.generation, self._ParseDictionary)
+
 	def GetPageTreeNode(self, ind):
 		return self.GetObject(ind.objid, ind.generation, self._ParsePageTreeNode)
 
@@ -426,6 +429,10 @@ class PDFTokenizer:
 		r.StreamRaw = s
 
 		return r
+
+	def _ParseDictionary(self, objidgen, tokens):
+		d = TokenHelpers.Convert(tokens[0].value[2])
+		return d[0]
 
 	def _ParseInt(self, objidgen, tokens):
 		# Example
@@ -627,6 +634,9 @@ class PDFTokenizer:
 		elif klass == _pdf.Resource:
 			if isinstance(value, _pdf.Dictionary) or isinstance(value, _pdf.Array):
 				return value
+			elif key == 'Font':
+				if isinstance(value, _pdf.IndirectObject):
+					return self.GetDictionary(value)
 
 		elif klass == _pdf.Font1 or klass == _pdf.FontTrue:
 			# Some of these may well be indirects but otherwise just return the value
@@ -744,6 +754,56 @@ class TextTokenizer:
 		print("\n".join(ret))
 
 		return " ".join(ret)
+
+
+class CMapTokenizer:
+	"""
+	Tokenizer for CMap programs.
+	"""
+
+	def __init__(self):
+		pass
+
+	def TokenizeString(self, txt):
+		return cmaploc.TokenizeString(txt)
+
+	def BuildMapper(self, txt):
+		toks = self.TokenizeString(txt)
+
+		codes = []
+
+		mapon = False
+		for tok in toks:
+			if tok.type == 'beginbfchar':
+				mapon = True
+			if mapon and tok.type == 'endbfchar':
+				mapon = False
+
+				# Make map
+				mapdat = {}
+				for i in range(0, len(codes), 2):
+					mapdat[ codes[i] ] = chr(codes[i+1])
+
+				def mapper(c):
+					if type(c) != str:
+						raise TypeError("Cannot map non-string: %s" % type(c))
+
+					cc = ord(c)
+					if cc in mapdat:
+						return mapdat[cc]
+					else:
+						raise KeyError("Cannot map character '%s' (ord %d): not found in map" % (c, cc))
+
+				return mapper
+
+			if mapon:
+				if tok.type == 'CODE':
+					codes.append(tok.value)
+
+
+		print(txt)
+		print(toks)
+		raise ValueError("Unable to generate map")
 
 
 class TokenHelpers:
