@@ -575,8 +575,8 @@ class PDFTokenizer:
 		klass = obj.__class__
 
 		# This is never an indirect object for any object
-		if key == 'Type':
-			return value
+		if key == 'Type':			return value
+		if key == 'Subtype':		return value
 
 		if klass == _pdf.Catalog:
 			if key == 'Pages':
