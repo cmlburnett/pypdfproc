@@ -113,6 +113,8 @@ class PDF:
 			else:
 				ct = cts.Stream
 
+			#print(ct)
+
 			# Tokenize stream as text operations
 			toks = tt.TokenizeString(ct)
 			# Ignore the residual
@@ -130,7 +132,10 @@ class PDF:
 					font['size'] = tok.value[1].value
 
 					f = font['f'] = self.GetFont(page, font['name'])
-					fd = f.FontDescriptor
+					if f.Subtype == 'Type0':
+						fd = None
+					else:
+						fd = f.FontDescriptor
 					enc = f.Encoding
 					cmap = f.ToUnicode
 
@@ -140,6 +145,7 @@ class PDF:
 					#print('Last char: %d' % f.LastChar)
 					#print([f, fd, enc, cmap])
 					#print(f.getsetprops())
+					#print(f.DescendantFonts)
 
 					w = f.Widths.array
 					w = [_ for _ in w if _>0]

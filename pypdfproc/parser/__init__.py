@@ -515,7 +515,8 @@ class PDFTokenizer:
 		typ = o[0]['Type']
 		styp = o[0]['Subtype']
 
-		if styp == 'Type1':			r = _pdf.Font1(self._DynamicLoader)
+		if styp == 'Type0':			r = _pdf.Font0(self._DynamicLoader)
+		elif styp == 'Type1':		r = _pdf.Font1(self._DynamicLoader)
 		elif styp == 'Type3':		r = _pdf.Font3(self._DynamicLoader)
 		elif styp == 'TrueType':	r = _pdf.FontTrue(self._DynamicLoader)
 		else:
@@ -637,6 +638,23 @@ class PDFTokenizer:
 			elif key == 'Font':
 				if isinstance(value, _pdf.IndirectObject):
 					return self.GetDictionary(value)
+
+		elif klass == _pdf.Font0:
+			if isinstance(value, _pdf.IndirectObject):
+				if key == 'Encoding':
+					return self.GetFontEncoding(value)
+				elif key == 'ToUnicode':
+					return self.GetFontToUnicode(value)
+				else:
+					pass
+			else:
+				if key == 'DescendantFonts':
+					r = []
+					for a in value.array:
+						r.append( self.GetFont(a) )
+					return r
+
+				return value
 
 		elif klass == _pdf.Font1 or klass == _pdf.FontTrue:
 			# Some of these may well be indirects but otherwise just return the value

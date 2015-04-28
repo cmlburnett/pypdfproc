@@ -473,6 +473,15 @@ class GraphicsState(PDFHigherBase):
 	_AIS = None
 	_TK = None
 
+class Font0(PDFHigherBase):
+	# Table 5.18 (pg 452-3) of 1.7 spec
+	_Type = None
+	_Subtype = None
+	_BaseFont = None
+	_Encoding = None
+	_DescendantFonts = None
+	_ToUnicode = None
+
 class Font1(PDFHigherBase):
 	# Table 5.8 (pg 413-5) of 1.7 spec
 	_Type = None
