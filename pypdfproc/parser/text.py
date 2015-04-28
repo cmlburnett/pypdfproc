@@ -14,6 +14,7 @@ tokens = (
 	'ARR_END',
 	'LIT_START',
 	'LIT_END',
+	'HEXSTRING',
 
 	'NAME',
 	'WS',
@@ -215,6 +216,13 @@ def t_NAME(t):
 
 	# Ignore slash (not formally a part of the name)
 	t.value = t.value[1:]
+	return t
+
+def t_HEXSTRING(t):
+	r'\<([0-9A-Fa-f]+)\>'
+
+	# Ignore brackets
+	t.value = t.value.rstrip('>').lstrip('<')
 	return t
 
 def t_error(t):
@@ -586,7 +594,7 @@ def TokensPostfixToPrefix(tokens):
 			# Update last index used
 			lastidx = i
 
-		elif t.type in ('INT', 'FLOAT', 'ARR_START', 'ARR_END', 'DICT_START', 'DICT_END', 'NAME', 'LIT'):
+		elif t.type in ('INT', 'FLOAT', 'ARR_START', 'ARR_END', 'DICT_START', 'DICT_END', 'NAME', 'LIT', 'HEXSTRING'):
 			pass
 
 		else:
