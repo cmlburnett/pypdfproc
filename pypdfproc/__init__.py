@@ -20,18 +20,19 @@ class PDF:
 	Basic entry point into manipulating PDF files.
 	"""
 
-	# File name, file object, and mmap object
+	# File name, file object (from open()), and mmap object
 	fname = None
 	f = None
 	m = None
 
-	# PDF parser
+	# PDF parser (from pdf.py)
 	p = None
 
 	def __init__(self, fname):
+		# Copy the file name
 		self.fname = fname
 
-		# Open file and mmap it
+		# Open file and mmap it (binary is important here so that python does not interpret the file as text)
 		self.f = open(fname, 'rb')
 		self.m = mmap.mmap(self.f.fileno(), 0, prot=mmap.PROT_READ)
 
@@ -48,9 +49,21 @@ class PDF:
 		self.p = None
 
 	def GetRootObject(self):
+		"""
+		Gets the root object (aka catalog) of the file.
+		"""
+
 		return self.p.GetRootObject()
 
 	def GetFont(self, page, fontname):
+		"""
+		The text operation Tf uses a font name that maps to a font via the page's Resources object.
+		This looks up the fontname for the given page.
+		The page can be a Page object or a page number (page is found by DFS'ing the page tree and
+		counting (i.e., it does not look at page labels)).
+		"""
+
+		# Page number provided, find corresponding page
 		if type(page) == int:
 			root = self.GetRootObject()
 			pages = root.Pages.DFSPages()
@@ -226,6 +239,14 @@ class PDF:
 		return "".join(txt)
 
 	def GetPageThumbnail(self, page):
+		"""
+		Returns the Thumb object for the provided page.
+		If no Thumb is provided in the file then None is returned instead.
+
+		The page can be a Page object or a page number (page is found by DFS'ing the page tree and
+		counting (i.e., it does not look at page labels)).
+		"""
+
 		if type(page) == int:
 			root = self.GetRootObject()
 			pages = root.Pages.DFSPages()
