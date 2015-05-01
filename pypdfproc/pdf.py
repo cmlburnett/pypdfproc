@@ -94,6 +94,10 @@ class Hexstring(PDFBase):
 	string = None
 
 class Dictionary(PDFBase):
+	"""
+	This object acts like a dictionary and permits item get and set as well as iteration.
+	"""
+
 	dictionary = None
 
 	def __contains__(self, k):		return k in self.dictionary
@@ -106,6 +110,10 @@ class Dictionary(PDFBase):
 	def __str__(self):				return "<%s %s>" % (self.__class__.__name__, str(self.dictionary))
 
 class Array(PDFBase):
+	"""
+	This object acts like a list and permits item get and set as well as iteration and len.
+	"""
+
 	array = None
 
 	def __len__(self):				return len(self.array)
@@ -116,6 +124,10 @@ class Array(PDFBase):
 	def __str__(self):				return "<%s %s>" % (self.__class__.__name__, str(self.array))
 
 class IndirectObject(PDFBase):
+	"""
+	This object represents an indirect object reference (e.g., "12 0 R" for object id (objid) 12 and generation 0).
+	"""
+
 	objid = None
 	generation = None
 
@@ -123,10 +135,15 @@ class IndirectObject(PDFBase):
 	def __str__(self):				return "<%s (%d %d R)>" % (self.__class__.__name__, self.objid, self.generation)
 
 class XRefMapEntry(PDFBase):
+	"""
+	An instance of an xref row that includes an object id (objid), generation, and inuse flag.
+	An xref section includes multiple of this.
+	"""
+
 	objid = None
 	offset = None
 	generation = None
-	inuse = None
+	inuse = None # Represented as 'n' or 'f' in the PDF but interpreted as True and False in python
 
 	def __repr__(self):				return str(self)
 	def __str__(self):				return "<%s (%d %d) -> %d inuse=%b>" % (self.__class__.__name__, self.objid, self.generation, self.offset, self.inuse)
@@ -136,9 +153,21 @@ class XRefMapEntry(PDFBase):
 # PDF parts
 
 class Header(PDFBase):
+	"""
+	This object represents the header of the file that identifies the version.
+	"""
+
 	version = None
 
 class Trailer(PDFBase):
+	"""
+	This object represents the trailer that is included after each xref section.
+	It consists of a dictionary, the startxref object, and the related xref object.
+	As the PDF is parsed, the xref/trailers are linked together so that they may be traversed in either direction.
+	NB: the next/prev nomenclature is opposite of that used within PDF (each trailer specifies
+	Prev entry whereas that object is set to next on this object). Sorry.
+	"""
+
 	dictionary = None
 	xref = None
 	startxref = None
@@ -157,12 +186,24 @@ class Trailer(PDFBase):
 		return "<%s %x prev=%s next=%s xref=%x startxref=%d %s>" % (self.__class__.__name__, id(self), prevtrail, nexttrail, id(self.xref), self.startxref.offset, str(self.dictionary))
 
 class StartXRef(PDFBase):
+	"""
+	This object represents the startxref offset that points to the xref section offset within the file.
+	"""
+
 	offset = None
 
 	def __repr__(self):				return str(self)
 	def __str__(self):				return "<%s %d>" % (self.__class__.__name__, self.offset)
 
 class XRef(PDFBase):
+	"""
+	This object represents an xref section that precedes the trailer.
+	It consists of a sequence of offsets (XRefMapEntry objects) and the associated Trailer object.
+	As the PDF is parsed, the xref/trailers are linked together so that they may be traversed in either direction.
+	NB: the next/prev nomenclature is opposite of that used within PDF (each trailer specifies
+	Prev entry whereas that object is set to next on this object). Sorry.
+	"""
+
 	offsets = None
 	trailer = None
 
@@ -187,6 +228,10 @@ class Object(PDFBase):
 	generation = None
 
 class EOF(PDFBase):
+	"""
+	This object represents the "%%EOF" after the trailer.
+	"""
+
 	pass
 
 # ------------------------------------------------------------------------------
@@ -194,6 +239,32 @@ class EOF(PDFBase):
 # Higher-order PDF parts
 
 class PDFHigherBase(PDFBase):
+	"""
+	Base class that utilizes a dynamic loader for attributes.
+	Thus, the caller invokes __getattr__ which checks the instance dictionary for a value
+	and, if set, it returns the value otherwise it invokes the loader.
+	Thus, each property is loaded once and only once.
+	When the object is loaded, the PDF values are stored in a class attribute prefixed by an underscore.
+
+	Implementation of this base class requires setting class attributes prefixed with an underscore.
+	Thus, if the object has attribute Type then _Type=None should be defined within the class.
+	When the object is loaded the underscore-prefixed attribute value is provided to the loader.
+	This permits the loader to load the value based on the PDF-object value.
+	This is particularly useful for when attribute values are indirect objects and the loader
+	can dynamically load the referenced object.
+
+	For example, PageTreeNode.Parent is an indirect reference to the parent node.
+	If a node (2 0 R) is loaded with Parent (1 0 R) then the PageNodeTree._Parent == (1 0 R).
+	Accessing node.Parent will pass (1 0 R) to the dynamic loader, which will get the correct object
+	and return it.
+	All future accesses to node.Parent will return the cached object within node object.
+
+	Another example, consider PageTreeNode.Kids which can be an array of indirect references.
+	The dynamic loader would return an Array of PageTreeNode or Page objects (depending on what they
+	point to).
+	Thus, the dynamic loader permits changing the actual object attribute based on the PDF data.
+	"""
+
 	_Loader = None
 
 	def __init__(self, loader):
@@ -248,6 +319,15 @@ class PDFHigherBase(PDFBase):
 		return ret
 
 class PDFStreamBase(PDFBase):
+	"""
+	Base class that handles objects that are streams.
+	It assumes the stream includes a dictionary with Length property (well, the underlying parser
+	assumes the Length is there to read the appropriate amount of the stream).
+	The raw stream data is retained until the Stream attribute is accessed.
+	When it is accessed the raw stream (StreamRaw) is decoded per Filter in the dictionary.
+	The decoded stream is cached in the Stream attribute.
+	"""
+
 	Dict = None
 	StreamRaw = None
 
