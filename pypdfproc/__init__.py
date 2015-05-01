@@ -121,7 +121,21 @@ class PDF:
 			toks = toks['tokens']
 
 			# Keep track of font information
-			font = {'name': None, 'size': None, 'f': None}
+			font = {}
+			font['Tf'] = None		# Font name specified by Tf
+			font['Tfs'] = None		# Font size specified by Tf
+			font['f'] = None		# _pdf.Font object
+			font['Tc'] = 0			# Character width specified by Tc
+			font['Tw'] = 0			# Word width specified by Tw
+			font['Th'] = 100		# Horizontal spacing specified by Tz (units of 1%)
+			font['Tl'] = 0			# Leading specified by TL
+			font['Tmode'] = 0		# Rendering mode specified by Tr
+			font['Trise'] = 0		# Rise specified by Ts
+			font['Tk'] = None		# Kncokout specified by ????
+			font['Tm'] = None		# Text matrix
+			font['Tlm'] = None		# Text line matrix
+			font['Trm'] = None		# Text rendering matrix
+
 
 			# Iterate through the tokens that draw text to the page
 			for tok in toks:
@@ -165,6 +179,7 @@ class PDF:
 					#print(['l', l])
 					ret = SplitLiteral(l)
 					#print(ret)
+					#print([ord(c) for c in ret])
 					ret = [MapCharacter(f, enc, cmap, c) for c in ret]
 					#print(ret)
 					txt += ret
@@ -178,6 +193,8 @@ class PDF:
 					for part in v:
 						if part.type == 'LIT':
 							ret = SplitLiteral(part.value)
+							#print(ret)
+							#print([ord(c) for c in ret])
 							ret = [MapCharacter(f, enc, cmap, c) for c in ret]
 							#print(ret)
 							txt += ret
@@ -290,6 +307,11 @@ def MapCharacter(f, enc, cmap, c):
 			if type(ret) == int:
 				raise TypeError("Should return char for '%s' but got integer %d" % (c, ret))
 			return ret
+	elif type(enc) == str:
+		if enc == 'MacRomanEncoding':
+			return c.encode('latin-1').decode('mac_roman')
+		else:
+			raise NotImplementedError("Unrecognized font encoding: '%s'" % enc)
 	else:
 		# No mapping: PDF character code is equivalent to unicode character (neat)
 		return c
