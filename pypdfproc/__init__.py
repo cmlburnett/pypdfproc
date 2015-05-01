@@ -184,7 +184,9 @@ class PDF:
 					#print(ret)
 					txt += ret
 
-					txt += ' '
+					# FIXME: need to more fully implement graphics state to ascertain if a space is needed
+					# (e.g., starting next line vs. changing font mid-word)
+					#txt += ' '
 
 				# Token is an array of literal and inter-character spacing integers
 				elif tok.type == 'TJ':
@@ -212,7 +214,9 @@ class PDF:
 						else:
 							raise TypeError("Unrecognize type in TJ array: %s" % part.type)
 
-					txt += ' '
+					# FIXME: need to more fully implement graphics state to ascertain if a space is needed
+					# (e.g., starting next line vs. changing font mid-word)
+					#txt += ' '
 
 				# Don't care about anything else
 				# NB: possible that state is pushed and poped (Q and q) that changes the current font information, but that's more advanced for now
