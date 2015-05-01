@@ -244,6 +244,11 @@ t_ignore = ''
 lexer = plylex.lex()
 
 class PDFToken(object):
+	"""
+	Reimplementation of the LexToken.
+	Primary purpose of this is separation of levels as post-fix is converted to pre-fix notation (essentially).
+	"""
+
 	def __init__(self, type, value, lineno, lexpos, page=None):
 		self.type = type
 		self.value = value
