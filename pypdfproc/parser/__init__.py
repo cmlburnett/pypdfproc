@@ -548,18 +548,23 @@ class PDFTokenizer:
 		Several subtypes of XObject, must switch depending on Subtype.
 		"""
 
-		o = TokenHelpers.Convert(tokens[0].value[2])
-		if 'Type' in o[0]:			typ = o[0]['Type']
+		d = TokenHelpers.Convert(tokens[0].value[2][0])
+		s = TokenHelpers.Convert(tokens[0].value[2][1])
+
+		if 'Type' in d:				typ = d['Type']
 		else:						typ = 'XObject'
-		styp = o[0]['Subtype']
+		styp = d['Subtype']
 
 		if styp == 'Form':			r = _pdf.XObjectForm(self._DynamicLoader)
 		elif styp == 'Image':		r = _pdf.XObjectImage(self._DynamicLoader)
 		else:
 			raise ValueError("Unrecognized object type (%s) for this function: neither Form or Image" % styp)
 
-		for k in o[0]:
-			setattr(r, '_' + k, o[0][k])
+		for k in d:
+			setattr(r, '_' + k, d[k])
+
+		r.Dict = d
+		r.StreamRaw = s
 
 		return r
 
@@ -689,6 +694,12 @@ class PDFTokenizer:
 			else:
 				return value
 
+		elif klass == _pdf.XObjectImage:
+			if isinstance(value, _pdf.IndirectObject):
+				pass
+			else:
+				return value
+
 		print(value)
 		raise NotImplementedError("Dynamic loader for class '%s' and key '%s' not implemented" % (klass.__name__, key))
 
@@ -721,7 +732,7 @@ class TextTokenizer:
 		state = {}
 		state['font'] = {}
 
-		print('=================')
+		#print('=================')
 		for i in range(len(tokens)):
 			tok = tokens[i]
 			print(tok)

@@ -272,6 +272,26 @@ class PDFHigherBase(PDFBase):
 
 		self._Loader = loader
 
+	def _FindBaseClassAttr(self, klass, kk):
+		"""
+		Iterate through class and its base classes to find attribute.
+		"""
+
+		# Find in provided class?
+		if kk in klass.__dict__:
+			return klass.__dict__[kk]
+
+		# Check through base classes
+		else:
+			for kla in klass.__bases__:
+				try: 
+					return self._FindBaseClassAttr(kla, kk)
+				except KeyError:
+					continue
+
+			# Not found in base classes at this level so throw a KeyError
+			raise KeyError(kk)
+
 	def __getattr__(self, k):
 		# Possibilities:
 		# 1) k is a valid property name and loaded
@@ -283,7 +303,7 @@ class PDFHigherBase(PDFBase):
 		kk = '_' + k
 
 		# Handle (5)
-		kval = self.__class__.__dict__[kk]
+		kval = self._FindBaseClassAttr(self.__class__, kk)
 
 		# Handle (1-3)
 		if kk in self.__dict__:
@@ -638,16 +658,22 @@ class FontEncoding(PDFHigherBase):
 class FontToUnicode(PDFStreamBase):
 	pass
 
-class XObject(PDFHigherBase):
+class XObject(PDFHigherBase,PDFStreamBase):
 	# Table ???
 	_Type = None
 	_Subtype = None
 
+	def __getattr__(self, k):
+		if k in ('Stream', 'StreamRaw'):
+			return PDFStreamBase.__getattr__(self, k)
+		else:
+			return PDFHigherBase.__getattr__(self, k)
 
-class XObjectForm(PDFHigherBase):
+
+
+
+class XObjectForm(XObject):
 	# Table 4.45 (pg 358-60) of 1.7 spec
-	_Type = None
-	_Subtype = None
 	_FormType = None
 	_BBox = None
 	_Matrix = None
@@ -663,10 +689,8 @@ class XObjectForm(PDFHigherBase):
 	_OC = None
 	_Name = None
 
-class XObjectImage(PDFHigherBase):
+class XObjectImage(XObject):
 	# Table 4.39 (pg 340-3) of 1.7 spec
-	_Type = None
-	_Subtype = None
 	_Width = None
 	_Height = None
 	_ColorSpace = None

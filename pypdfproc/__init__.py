@@ -55,6 +55,11 @@ class PDF:
 
 		return self.p.GetRootObject()
 
+	def GetDFSPages(self):
+		root = self.GetRootObject()
+
+		return root.Pages.DFSPages()
+
 	def GetFont(self, page, fontname):
 		"""
 		The text operation Tf uses a font name that maps to a font via the page's Resources object.
