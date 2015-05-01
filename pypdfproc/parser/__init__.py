@@ -414,6 +414,9 @@ class PDFTokenizer:
 	def GetFontToUnicode(self, ind):
 		return self.GetObject(ind.objid, ind.generation, self._ParseFontToUnicode)
 
+	def GetFontWidths(self, ind):
+		return self.GetObject(ind.objid, ind.generation, self._ParseArray)
+
 	def GetXObject(self, ind):
 		return self.GetObject(ind.objid, ind.generation, self._ParseXObject)
 
@@ -433,6 +436,10 @@ class PDFTokenizer:
 	def _ParseDictionary(self, objidgen, tokens):
 		d = TokenHelpers.Convert(tokens[0].value[2])
 		return d[0]
+
+	def _ParseArray(self, objidgen, tokens):
+		a = TokenHelpers.Convert(tokens[0].value[2])
+		return a[0]
 
 	def _ParseInt(self, objidgen, tokens):
 		# Example
@@ -665,6 +672,8 @@ class PDFTokenizer:
 					return self.GetFontEncoding(value)
 				elif key == 'ToUnicode':
 					return self.GetFontToUnicode(value)
+				elif key == 'Widths':
+					return self.GetFontWidths(value)
 				else:
 					pass
 			else:
@@ -680,6 +689,7 @@ class PDFTokenizer:
 			else:
 				return value
 
+		print(value)
 		raise NotImplementedError("Dynamic loader for class '%s' and key '%s' not implemented" % (klass.__name__, key))
 
 
