@@ -364,6 +364,8 @@ class PDFTokenizer:
 			x = x.next
 			t = t.next
 
+		return None
+
 	def GetRootObject(self):
 		"""
 		Find the root (catalog) object, process it, and return it.
