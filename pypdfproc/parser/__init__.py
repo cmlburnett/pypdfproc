@@ -319,12 +319,15 @@ class PDFTokenizer:
 
 		# Process the token stream into something better
 		# The result should not have tokens or any similar concept (separation of layers)
-		o = handler(k, toks)
+		if handler != None:
+			o = handler(k, toks)
+		else:
+			raise NotImplementedError()
 
 		# Return processed token stream
 		return o
 
-	def GetObject(self, objid, generation, handler):
+	def GetObject(self, objid, generation, handler=None):
 		"""
 		Pull an object from the cache or load it if it's not loaded yet.
 		Must provide a handler to convert raw object data into something meaningful.
@@ -524,10 +527,12 @@ class PDFTokenizer:
 		typ = o[0]['Type']
 		styp = o[0]['Subtype']
 
-		if styp == 'Type0':			r = _pdf.Font0(self._DynamicLoader)
-		elif styp == 'Type1':		r = _pdf.Font1(self._DynamicLoader)
-		elif styp == 'Type3':		r = _pdf.Font3(self._DynamicLoader)
-		elif styp == 'TrueType':	r = _pdf.FontTrue(self._DynamicLoader)
+		if styp == 'Type0':				r = _pdf.Font0(self._DynamicLoader)
+		elif styp == 'Type1':			r = _pdf.Font1(self._DynamicLoader)
+		elif styp == 'Type3':			r = _pdf.Font3(self._DynamicLoader)
+		elif styp == 'TrueType':		r = _pdf.FontTrue(self._DynamicLoader)
+		elif styp == 'CIDFontType0':	r = _pdf.FontCID0(self._DynamicLoader)
+		elif styp == 'CIDFontType2':	r = _pdf.FontCID2(self._DynamicLoader)
 		else:
 			raise ValueError("Unrecognized object type (%s) for this function: neither Type1,  Type3, or TrueType" % styp)
 
@@ -690,6 +695,14 @@ class PDFTokenizer:
 			if key == 'FontDescriptor':
 				return self.GetFontDescriptor(value)
 
+		elif klass in (_pdf.FontCID0, _pdf.FontCID2):
+			if isinstance(value, _pdf.IndirectObject):
+				if key == 'FontDescriptor':
+					return self.GetFontDescriptor(value)
+			else:
+				return value
+
+
 		elif klass == _pdf.FontEncoding:
 			if isinstance(value, _pdf.IndirectObject):
 				pass
@@ -811,8 +824,12 @@ class CMapTokenizer:
 	def BuildMapper(self, txt):
 		toks = self.TokenizeString(txt)
 
+		# Final map data
+		mapdat = {}
+
 		codes = []
 
+		# Handle individual character mappings
 		mapon = False
 		for tok in toks:
 			if tok.type == 'beginbfchar':
@@ -821,31 +838,51 @@ class CMapTokenizer:
 				mapon = False
 
 				# Make map
-				mapdat = {}
 				for i in range(0, len(codes), 2):
 					mapdat[ codes[i] ] = chr(codes[i+1])
 
-				def mapper(c):
-					if type(c) != str:
-						raise TypeError("Cannot map non-string: %s" % type(c))
-
-					cc = ord(c)
-					if cc in mapdat:
-						return mapdat[cc]
-					else:
-						raise KeyError("Cannot map character '%s' (ord %d): not found in map" % (c, cc))
-
-				return mapper
+				break
 
 			if mapon:
 				if tok.type == 'CODE':
 					codes.append(tok.value)
 
+		# Handle character range mappings
+		codes = []
+		mapon = False
+		for tok in toks:
+			if tok.type == 'beginbfrange':
+				mapon = True
+			if mapon and tok.type == 'endbfrange':
+				mapon = False
 
-		print(txt)
-		print(toks)
-		raise ValueError("Unable to generate map")
+				for i in range(0, len(codes), 3):
+					sindex = codes[i]
+					eindex = codes[i+1]
+					offset = codes[i+2]
 
+					for k in range(codes[i], codes[i+1]+1):
+						mapdat[k] = chr(offset + (k - codes[i]))
+
+				break
+
+			if mapon:
+				if tok.type == 'CODE':
+					codes.append(tok.value)
+				elif tok.type == 'ARR':
+					raise NotImplementedError("Not setup to handle bf range arrays")
+
+		def mapper(c):
+			if type(c) != str:
+				raise TypeError("Cannot map non-string: %s" % type(c))
+
+			cc = ord(c)
+			if cc in mapdat:
+				return mapdat[cc]
+			else:
+				raise KeyError("Cannot map character '%s' (ord %d): not found in map" % (c, cc))
+
+		return mapper
 
 class TokenHelpers:
 	@staticmethod

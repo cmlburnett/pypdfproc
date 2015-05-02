@@ -48,7 +48,7 @@ class PDF:
 		"""
 		Makes the xref map that is self.objmap.
 		Keys the self.objmap by (objid, generation) tuples with value of the integer offset within the file.
-		
+
 		This follows the xref/trailer chain throughout the file and keeps the "newest" version of each object,
 		meaning that this correctly handles incremental updates to objects.
 		"""
@@ -623,6 +623,32 @@ class FontTrue(Font1):
 	_FontDescriptor = None
 	_Encoding = None
 	_ToUnicode = None
+
+class FontCID0(PDFHigherBase):
+	# Table 51.4 (pg 436-7) of 1.7 spec
+	_Type = None
+	_Subtype = None
+	_BaseFont = None
+	_CIDSystemInfo = None
+	_FontDescriptor = None
+	_DW = None
+	_W = None
+	_DW2 = None
+	_W2 = None
+	_CIDToGIDMap = None
+
+class FontCID2(PDFHigherBase):
+	# Table 51.4 (pg 436-7) of 1.7 spec
+	_Type = None
+	_Subtype = None
+	_BaseFont = None
+	_CIDSystemInfo = None
+	_FontDescriptor = None
+	_DW = None
+	_W = None
+	_DW2 = None
+	_W2 = None
+	_CIDToGIDMap = None
 
 class FontDescriptor(PDFHigherBase):
 	# Table 5.19 (pg 456-8) of 1.7 spec

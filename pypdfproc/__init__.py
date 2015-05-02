@@ -154,6 +154,8 @@ class PDF:
 			font['Tlm'] = None		# Text line matrix
 			font['Trm'] = None		# Text rendering matrix
 
+			# Needed some times for Identity-H encoded fonts with hexstrings that are 2 bytes rather than 1 byte
+			btsz = None
 
 			# Iterate through the tokens that draw text to the page
 			for tok in toks:
@@ -171,33 +173,61 @@ class PDF:
 					enc = f.Encoding
 					cmap = f.ToUnicode
 
+					# Identity-H needs 2 bytes from hex strings
+					if type(enc) == str and enc == 'Identity-H':
+						btsz = 2
+					else:
+						btsz = None
+
+					#print(['f', f])
+					#print(f.getsetprops())
 					#print('Font: %s' % f.BaseFont)
 					#print('Size: %s' % font['size'])
-					#print('First char: %d' % f.FirstChar)
-					#print('Last char: %d' % f.LastChar)
+
+					#if f.Subtype in ('Type1', 'Type3', 'TrueType'):
+					#	print('First char: %d' % f.FirstChar)
+					#	print('Last char: %d' % f.LastChar)
+					#elif f.Subtype in ('Font0'):
+					#	print(['descendant fonts', f.DescendantFonts])
+
 					#print([f, fd, enc, cmap])
 					#print(f.getsetprops())
 					#print(f.DescendantFonts)
+					if len(f.DescendantFonts) == 1:
+						w = f.DescendantFonts[0].W.array
+						wmap = CIDWidthArrayToMap(w)
 
-					w = f.Widths.array
-					w = [_ for _ in w if _>0]
-					avg = (sum(w))/len(w)
-					font['sizes'] = {'min': min(w), 'avg': avg, 'max': max(w)}
-					#print(['w', w, min(w), avg, max(w)])
-					#print(fd.getsetprops())
-					#if type(enc) != str:
-					#	print(enc.getsetprops())
-					#print(cmap.Stream)
+						w = [_ for _ in wmap.values() if _>0]
+						avg = (sum(w))/len(w)
+						font['sizes'] = {'min': min(w), 'avg': avg, 'max': max(w)}
+
+
+					#for d in f.DescendantFonts:
+					#	print(d)
+					#	print(d.getsetprops())
+					#	print(d.FontDescriptor)
+					#	print(d.FontDescriptor.getsetprops())
+
+					if f.Subtype in ('Type1', 'Type3', 'TrueType'):
+						w = f.Widths.array
+
+						w = [_ for _ in w if _>0]
+						avg = (sum(w))/len(w)
+						font['sizes'] = {'min': min(w), 'avg': avg, 'max': max(w)}
+						#print(['w', w, min(w), avg, max(w)])
+						#print(fd.getsetprops())
+						#if type(enc) != str:
+						#	print(enc.getsetprops())
+						#print(cmap.Stream)
+					else:
+						font['sizes'] = {}
 
 				# Token value is a single literal of text
 				elif tok.type == 'Tj':
 					#print(['tok', tok])
-					l = tok.value[0].value
 
-					#print(['l', l])
-					ret = SplitLiteral(l)
-					#print(ret)
-					#print([ord(c) for c in ret])
+					ret = GetTokenString(tok.value[0], bytesize=btsz)
+
 					ret = [MapCharacter(f, enc, cmap, c) for c in ret]
 					#print(ret)
 					txt += ret
@@ -212,9 +242,8 @@ class PDF:
 					v = tok.value
 					for part in v:
 						if part.type == 'LIT':
-							ret = SplitLiteral(part.value)
-							#print(ret)
-							#print([ord(c) for c in ret])
+							ret = GetTokenString(part, bytesize=btsz)
+
 							ret = [MapCharacter(f, enc, cmap, c) for c in ret]
 							#print(ret)
 							txt += ret
@@ -272,6 +301,24 @@ class PDF:
 		t = page.Thumb
 		raise NotImplementedError()
 
+def GetTokenString(tok, bytesize=None):
+	if tok.type == 'LIT':
+		l = tok.value
+		#print(['l', l])
+
+		ret = SplitLiteral(l)
+
+	elif tok.type == 'HEXSTRING':
+		h = tok.value
+		#print(['h', h])
+
+		ret = SplitHex(h, bytesize)
+	else:
+		raise TypeError("Unrecognized Tj token type: %s" % tok.value[0].type)
+
+	#print(ret)
+	#print([ord(c) for c in ret])
+	return ret
 
 # FIXME: not the way to do this I don't think
 diffmap = {}
@@ -304,21 +351,21 @@ def MapCharacter(f, enc, cmap, c):
 	Not trivial...
 	"""
 
+	if cmap:
+		ct = parser.CMapTokenizer()
+		m = ct.BuildMapper(cmap.Stream)
+
+		try:
+			ret = m(c)
+			if type(ret) == int:
+				raise TypeError("Should return char for '%s' (ord %d) but got integer %d" % (c, ord(c), ret))
+			return ret
+
+		except KeyError:
+			# Not in CMap, so try the differences array
+			pass
+
 	if isinstance(enc, _pdf.FontEncoding):
-		if cmap:
-			ct = parser.CMapTokenizer()
-			m = ct.BuildMapper(cmap.Stream)
-
-			try:
-				ret = m(c)
-				if type(ret) == int:
-					raise TypeError("Should return char for '%s' (ord %d) but got integer %d" % (c, ord(c), ret))
-				return ret
-
-			except KeyError:
-				# Not in CMap, so try the differences array
-				pass
-
 		if enc.Differences:
 			m = DifferencesArrayToMap(enc.Differences)
 			#print(['enc', enc.getsetprops()])
@@ -340,6 +387,8 @@ def MapCharacter(f, enc, cmap, c):
 	elif type(enc) == str:
 		if enc == 'MacRomanEncoding':
 			return c.encode('latin-1').decode('mac_roman')
+		elif enc == 'Identity-H':
+			return c
 		else:
 			raise NotImplementedError("Unrecognized font encoding: '%s'" % enc)
 	else:
@@ -403,6 +452,44 @@ def SplitLiteral(lit):
 			i += 1
 
 	return ret
+
+def SplitHex(txt, bytesize):
+	"""
+	Split hex string into characters of specified number of bytes.
+	"""
+
+	if bytesize == None:
+		raise ValueError("Byte size not provided, cannot split hex string without it")
+
+	# Trailing zero can be dropped per PDF standard, so put it back
+	if len(txt)%2 == 1:
+		txt += '0'
+
+	if len(txt)%(bytesize*2) != 0:
+		raise ValueError("Cannot split hex string (len=%d) into %d bytes without assuming padding" % (len(txt), bytesize*2))
+
+	# If bytesize == 1 then need 2 characters, bytesize == 2 then need 4 characters
+	ret = []
+	for i in range(0, len(txt), bytesize*2):
+		ret.append( chr(int(txt[i:i+(bytesize*2)],16)) )
+
+	return ret
+
+def CIDWidthArrayToMap(arr):
+	mapdat = {}
+
+	lastcode = 0
+	for i in range(len(arr)):
+		if type(arr[i]) == int:
+			lastcode = i
+		elif isinstance(arr[i], _pdf.Array):
+			for k in range(len(arr[i])):
+				mapdat[lastcode] = arr[i][k]
+				lastcode += 1
+		else:
+			raise TypeError("Unrecognized type (%s) when iterating through CID widths array: %s" % (arr[i], arr))
+
+	return mapdat
 
 def DifferencesArrayToMap(arr):
 	"""
