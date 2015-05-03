@@ -682,7 +682,8 @@ class FontEncoding(PDFHigherBase):
 	_Differences = None
 
 class FontToUnicode(PDFStreamBase):
-	pass
+	# Cache for parser.CMapTokenizer().BuildMapper
+	CMapper = None
 
 class XObject(PDFHigherBase,PDFStreamBase):
 	# Table ???
