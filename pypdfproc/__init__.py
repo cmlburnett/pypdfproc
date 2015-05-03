@@ -345,18 +345,32 @@ diffmap['eight'] = '8'
 diffmap['nine'] = '9'
 diffmap['zero'] = '0'
 
-def MapCharacter(f, enc, cmap, c):
+unicode_mapdat = {}
+#unicode_mapdat[8211] = "-" # 2013 is EN DASH but can just use hyphen
+unicode_mapdat[8217] = "'" # 2019 is RIGHT SINGLE QUATATION MARK but is often used as an apostrophe
+
+def MapCharacter(f, enc, cmap, c, dounicodemap=True):
 	"""
 	This has the challenging task of converting a PDF character code to a unicode character.
 	Not trivial...
 	"""
 
+	# Map certain characters back to ascii stuff
+	c = _MapCharacter(f, enc, cmap, c)
+	if dounicodemap and ord(c) in unicode_mapdat:
+		return unicode_mapdat[ord(c)]
+	else:
+		return c
+
+def _MapCharacter(f, enc, cmap, c):
 	if cmap:
-		ct = parser.CMapTokenizer()
-		m = ct.BuildMapper(cmap.Stream)
+		# Do this once for each cmap stream
+		if not cmap.CMapper:
+			ct = parser.CMapTokenizer()
+			cmap.CMapper = ct.BuildMapper(cmap.Stream)
 
 		try:
-			ret = m(c)
+			ret = cmap.CMapper(c)
 			if type(ret) == int:
 				raise TypeError("Should return char for '%s' (ord %d) but got integer %d" % (c, ord(c), ret))
 			return ret
