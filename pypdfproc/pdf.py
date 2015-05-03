@@ -685,6 +685,12 @@ class FontToUnicode(PDFStreamBase):
 	# Cache for parser.CMapTokenizer().BuildMapper
 	CMapper = None
 
+class FontFile2(PDFStreamBase):
+	pass
+
+class FontFile3(PDFStreamBase):
+	pass
+
 class XObject(PDFHigherBase,PDFStreamBase):
 	# Table ???
 	_Type = None

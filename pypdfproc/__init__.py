@@ -134,6 +134,7 @@ class PDF:
 			#print(ct)
 
 			# Tokenize stream as text operations
+			print(ct)
 			toks = tt.TokenizeString(ct)
 			# Ignore the residual
 			toks = toks['tokens']
@@ -179,10 +180,10 @@ class PDF:
 					else:
 						btsz = None
 
-					#print(['f', f])
-					#print(f.getsetprops())
-					#print('Font: %s' % f.BaseFont)
-					#print('Size: %s' % font['size'])
+					print(['f', f])
+					print(f.getsetprops())
+					print('Font: %s' % f.BaseFont)
+					print('Size: %s' % font['size'])
 
 					#if f.Subtype in ('Type1', 'Type3', 'TrueType'):
 					#	print('First char: %d' % f.FirstChar)
@@ -190,16 +191,17 @@ class PDF:
 					#elif f.Subtype in ('Font0'):
 					#	print(['descendant fonts', f.DescendantFonts])
 
-					#print([f, fd, enc, cmap])
+					print([f, fd, enc, cmap])
 					#print(f.getsetprops())
 					#print(f.DescendantFonts)
-					if len(f.DescendantFonts) == 1:
-						w = f.DescendantFonts[0].W.array
-						wmap = CIDWidthArrayToMap(w)
+					if f.Subtype in ('Font0'):
+						if len(f.DescendantFonts) == 1:
+							w = f.DescendantFonts[0].W.array
+							wmap = CIDWidthArrayToMap(w)
 
-						w = [_ for _ in wmap.values() if _>0]
-						avg = (sum(w))/len(w)
-						font['sizes'] = {'min': min(w), 'avg': avg, 'max': max(w)}
+							w = [_ for _ in wmap.values() if _>0]
+							avg = (sum(w))/len(w)
+							font['sizes'] = {'min': min(w), 'avg': avg, 'max': max(w)}
 
 
 					#for d in f.DescendantFonts:
@@ -224,13 +226,15 @@ class PDF:
 
 				# Token value is a single literal of text
 				elif tok.type == 'Tj':
-					#print(['tok', tok])
+					print(['tok', tok])
 
 					ret = GetTokenString(tok.value[0], bytesize=btsz)
+					print(ret)
+					print([ord(r) for r in ret])
 
 					ret = [MapCharacter(f, enc, cmap, c) for c in ret]
-					#print(ret)
-					#print([ord(r) for r in ret])
+					print(ret)
+					print([ord(r) for r in ret])
 					txt += ret
 
 					# FIXME: need to more fully implement graphics state to ascertain if a space is needed
@@ -239,7 +243,7 @@ class PDF:
 
 				# Token is an array of literal and inter-character spacing integers
 				elif tok.type == 'TJ':
-					#print(['tok', tok])
+					print(['tok', tok])
 					v = tok.value
 					for part in v:
 						if part.type == 'LIT':
@@ -348,8 +352,14 @@ diffmap['nine'] = '9'
 diffmap['zero'] = '0'
 
 unicode_mapdat = {}
-#unicode_mapdat[8211] = "-" # 2013 is EN DASH but can just use hyphen
-unicode_mapdat[8217] = "'" # 2019 is RIGHT SINGLE QUATATION MARK but is often used as an apostrophe
+#unicode_mapdat[8211] = "-"		# x2013 is EN DASH but can just use hyphen
+unicode_mapdat[8217] = "'"		# x2019 is RIGHT SINGLE QUATATION MARK but is often used as an apostrophe
+unicode_mapdat[64428] = "ff"	# xFB00 is LATIN SMALL LIGATURE FF is sometimes used instead of "ff" for some reason
+unicode_mapdat[64429] = "fi"	# xFB01 is LATIN SMALL LIGATURE FI is sometimes used instead of "fi" for some reason
+unicode_mapdat[64430] = "fl"	# xFB02 is LATIN SMALL LIGATURE FL is sometimes used instead of "fl" for some reason
+unicode_mapdat[64431] = "ffi"	# xFB03 is LATIN SMALL LIGATURE FFI is sometimes used instead of "ffi" for some reason
+unicode_mapdat[64432] = "ffl"	# xFB04 is LATIN SMALL LIGATURE FFL is sometimes used instead of "ffl" for some reason
+unicode_mapdat[64434] = "st"	# xFB06 is LATIN SMALL LIGATURE ST is sometimes used instead of "st" for some reason
 
 def MapCharacter(f, enc, cmap, c, dounicodemap=True):
 	"""
@@ -358,7 +368,9 @@ def MapCharacter(f, enc, cmap, c, dounicodemap=True):
 	"""
 
 	# Map certain characters back to ascii stuff
+	print(['cpre', c])
 	c = _MapCharacter(f, enc, cmap, c)
+	print(['cpst', c])
 	if dounicodemap and ord(c) in unicode_mapdat:
 		return unicode_mapdat[ord(c)]
 	else:
@@ -384,8 +396,6 @@ def _MapCharacter(f, enc, cmap, c):
 	if isinstance(enc, _pdf.FontEncoding):
 		if enc.Differences:
 			m = DifferencesArrayToMap(enc.Differences)
-			#print(['enc', enc.getsetprops()])
-			#print(m)
 
 			if ord(c) not in m:
 				raise KeyError("Cannot map character (ord %d) in differences array with length %d" % (ord(c), len(enc.Differences)))
@@ -397,12 +407,24 @@ def _MapCharacter(f, enc, cmap, c):
 			else:
 				ret = ec
 
+			if ret == 'C6':
+				print(['diff', enc.Differences])
+				print(['enc', enc.getsetprops()])
+				print(m)
+				print(f.FontDescriptor.getsetprops())
+				print(f.FontDescriptor.FontFile3)
+				print(f.FontDescriptor.FontFile3.Dict)
+				print(f.FontDescriptor.FontFile3.Stream)
+
 			if type(ret) == int:
 				raise TypeError("Should return char for '%s' but got integer %d" % (c, ret))
 			return ret
 	elif type(enc) == str:
 		if enc == 'MacRomanEncoding':
 			return c.encode('latin-1').decode('mac_roman')
+		elif enc == 'WinAnsiEncoding':
+			# Apparently WinAnsiEncoding is close enough to latin-1
+			return c
 		elif enc == 'Identity-H':
 			return c
 		else:

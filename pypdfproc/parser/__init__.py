@@ -422,6 +422,12 @@ class PDFTokenizer:
 	def GetFontWidths(self, ind):
 		return self.GetObject(ind.objid, ind.generation, self._ParseArray)
 
+	def GetFontFile2(self, ind):
+		return self.GetObject(ind.objid, ind.generation, self._ParseFontFile2)
+
+	def GetFontFile3(self, ind):
+		return self.GetObject(ind.objid, ind.generation, self._ParseFontFile3)
+
 	def GetXObject(self, ind):
 		return self.GetObject(ind.objid, ind.generation, self._ParseXObject)
 
@@ -549,6 +555,13 @@ class PDFTokenizer:
 
 	def _ParseFontToUnicode(self, objidgen, tokens):
 		return self._ParseStream(objidgen, tokens, _pdf.FontToUnicode)
+
+	def _ParseFontFile2(self, objidgen, tokens):
+		return self._ParseStream(objidgen, tokens, _pdf.FontFile2)
+
+	def _ParseFontFile3(self, objidgen, tokens):
+		return self._ParseStream(objidgen, tokens, _pdf.FontFile3)
+
 
 	def _ParseXObject(self, objidgen, tokens):
 		"""
@@ -702,6 +715,11 @@ class PDFTokenizer:
 			else:
 				return value
 
+		elif klass == _pdf.FontDescriptor:
+			if key == 'FontFile3':
+				return self.GetFontFile3(value)
+			elif key == 'FontFile2':
+				return sefl.GetFontFile2(value)
 
 		elif klass == _pdf.FontEncoding:
 			if isinstance(value, _pdf.IndirectObject):
