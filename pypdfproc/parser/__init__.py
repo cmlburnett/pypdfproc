@@ -428,11 +428,11 @@ class PDFTokenizer:
 
 
 
-	def _ParseStream(self, objidgen, tokens):
+	def _ParseStream(self, objidgen, tokens, klass=_pdf.Content):
 		d = TokenHelpers.Convert(tokens[0].value[2][0])
 		s = TokenHelpers.Convert(tokens[0].value[2][1])
 
-		r = _pdf.Content()
+		r = klass()
 		r.Dict = d
 		r.StreamRaw = s
 
@@ -548,7 +548,7 @@ class PDFTokenizer:
 		return self._StupidObjectParser(objidgen, tokens, _pdf.FontEncoding)
 
 	def _ParseFontToUnicode(self, objidgen, tokens):
-		return self._ParseStream(objidgen, tokens)
+		return self._ParseStream(objidgen, tokens, _pdf.FontToUnicode)
 
 	def _ParseXObject(self, objidgen, tokens):
 		"""

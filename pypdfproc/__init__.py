@@ -230,6 +230,7 @@ class PDF:
 
 					ret = [MapCharacter(f, enc, cmap, c) for c in ret]
 					#print(ret)
+					#print([ord(r) for r in ret])
 					txt += ret
 
 					# FIXME: need to more fully implement graphics state to ascertain if a space is needed
@@ -246,6 +247,7 @@ class PDF:
 
 							ret = [MapCharacter(f, enc, cmap, c) for c in ret]
 							#print(ret)
+							#print([ord(r) for r in ret])
 							txt += ret
 						elif part.type in ('INT', 'FLOAT'):
 							# FIXME: may have to content with inter-character spacing used for space characters...
