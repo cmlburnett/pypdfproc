@@ -134,7 +134,7 @@ class PDF:
 			#print(ct)
 
 			# Tokenize stream as text operations
-			print(ct)
+			#print(ct)
 			toks = tt.TokenizeString(ct)
 			# Ignore the residual
 			toks = toks['tokens']
@@ -180,10 +180,10 @@ class PDF:
 					else:
 						btsz = None
 
-					print(['f', f])
-					print(f.getsetprops())
+					#print(['f', f])
+					#print(f.getsetprops())
 					print('Font: %s' % f.BaseFont)
-					print('Size: %s' % font['size'])
+					#print('Size: %s' % font['size'])
 
 					#if f.Subtype in ('Type1', 'Type3', 'TrueType'):
 					#	print('First char: %d' % f.FirstChar)
@@ -191,7 +191,7 @@ class PDF:
 					#elif f.Subtype in ('Font0'):
 					#	print(['descendant fonts', f.DescendantFonts])
 
-					print([f, fd, enc, cmap])
+					#print([f, fd, enc, cmap])
 					#print(f.getsetprops())
 					#print(f.DescendantFonts)
 					if f.Subtype in ('Font0'):
@@ -226,15 +226,15 @@ class PDF:
 
 				# Token value is a single literal of text
 				elif tok.type == 'Tj':
-					print(['tok', tok])
+					#print(['tok', tok])
 
 					ret = GetTokenString(tok.value[0], bytesize=btsz)
-					print(ret)
-					print([ord(r) for r in ret])
+					#print(ret)
+					#print([ord(r) for r in ret])
 
 					ret = [MapCharacter(f, enc, cmap, c) for c in ret]
-					print(ret)
-					print([ord(r) for r in ret])
+					#print(ret)
+					#print([ord(r) for r in ret])
 					txt += ret
 
 					# FIXME: need to more fully implement graphics state to ascertain if a space is needed
@@ -243,7 +243,7 @@ class PDF:
 
 				# Token is an array of literal and inter-character spacing integers
 				elif tok.type == 'TJ':
-					print(['tok', tok])
+					#print(['tok', tok])
 					v = tok.value
 					for part in v:
 						if part.type == 'LIT':
@@ -351,6 +351,13 @@ diffmap['eight'] = '8'
 diffmap['nine'] = '9'
 diffmap['zero'] = '0'
 
+# FIXME: work-around for font AdvP4C4E51
+diffmap['C0'] = '\u2212'		# Minus sign
+diffmap['C6'] = '\u00B1'		# Plus-minus sign
+diffmap['C14'] = '\u00B0'		# Degree symbol
+diffmap['C15'] = '\u2022'		# Bullet
+diffmap['C211'] = '\u00A9'		# Copyright
+
 unicode_mapdat = {}
 #unicode_mapdat[8211] = "-"		# x2013 is EN DASH but can just use hyphen
 unicode_mapdat[8217] = "'"		# x2019 is RIGHT SINGLE QUATATION MARK but is often used as an apostrophe
@@ -368,9 +375,8 @@ def MapCharacter(f, enc, cmap, c, dounicodemap=True):
 	"""
 
 	# Map certain characters back to ascii stuff
-	print(['cpre', c])
 	c = _MapCharacter(f, enc, cmap, c)
-	print(['cpst', c])
+
 	if dounicodemap and ord(c) in unicode_mapdat:
 		return unicode_mapdat[ord(c)]
 	else:
@@ -387,6 +393,9 @@ def _MapCharacter(f, enc, cmap, c):
 			ret = cmap.CMapper(c)
 			if type(ret) == int:
 				raise TypeError("Should return char for '%s' (ord %d) but got integer %d" % (c, ord(c), ret))
+
+			if ret in diffmap:
+				ret = diffmap[ret]
 			return ret
 
 		except KeyError:
