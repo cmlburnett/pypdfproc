@@ -3,10 +3,11 @@ import os
 from . import pdf as pdfloc
 from . import text as textloc
 from . import cmap as cmaploc
+from .state import StateManager, State, Mat3x3, Pos
 
 from .. import pdf as _pdf
 
-__all__ = ['PDFTokenizer']
+__all__ = ['PDFTokenizer', 'TextTokenizer', 'CMapTokenizer', 'State']
 
 def gotoend(f):
 	"""

@@ -103,6 +103,75 @@ class PDF:
 		# Return Font1, Font3, or FontTrue object
 		return f
 
+	def RenderPage(self, page):
+		"""
+		Renders the page by processing every content command.
+		"""
+
+		# Page number provided, find corresponding page
+		if type(page) == int:
+			root = self.GetRootObject()
+			pages = root.Pages.DFSPages()
+
+			if page < 1:				raise ValueError("Page number (%d) must be a positive number" % page)
+			if page > len(pages):		raise ValueError("Page number (%d) is larger the total number of pages" % page)
+
+			# Get page (pages is zero-based and pagenum is one-based, so subtract one)
+			page = pages[page-1]
+
+		elif isinstance(page, _pdf.Page):
+			# Page supplied, nothing to get
+			pass
+
+		else:
+			raise TypeError("Unrecognized page type passed: %s" % page)
+
+		# The text tokenizer
+		tt = parser.TextTokenizer(self.f, self.p)
+
+		cts = page.Contents
+		if type(cts) == list:
+			ct = " ".join([ct.Stream for ct in cts])
+		else:
+			ct = cts.Stream
+		print(ct)
+
+		s = parser.StateManager()
+
+		toks = tt.TokenizeString(ct)['tokens']
+		for tok in toks:
+			print(['tok', tok])
+			# Save and restore state
+			if tok.type == 'q':			s.Push()
+			elif tok.type == 'Q':		s.Pop()
+
+			# Graphics
+			elif tok.type == 're':		s.S.do_re(*[v.value for v in tok.value])
+			elif tok.type == 'W':		pass
+			elif tok.type == 'W*':		pass
+			elif tok.type == 'n':		pass
+
+			# Colorspaces
+			elif tok.type == 'cs':		pass
+			elif tok.type == 'CS':		pass
+			elif tok.type == 'sc':		pass
+			elif tok.type == 'SC':		pass
+
+			# Transforms
+			elif tok.type == 'cm':		s.S.cm = parser.Mat3x3(*[v.value for v in tok.value]) # Six numbers representing the matrix
+
+			# Text
+			elif tok.type == 'BT':		pass
+			elif tok.type == 'ET':		pass
+			elif tok.type == 'Tf':		s.S.Tf = (tok.value[0].value, tok.value[1].value) # Font name and font size (int or float)
+			elif tok.type == 'Tj':		pass
+			elif tok.type == 'TJ':		pass
+			elif tok.type == 'Tm':		pass
+			elif tok.type == 'Tc':		pass
+
+			else:
+				raise ValueError("Cannot render '%s' token yet" % tok.type)
+
 	def GetFullText(self):
 		"""
 		Get the full text in the document.
@@ -182,7 +251,7 @@ class PDF:
 
 					#print(['f', f])
 					#print(f.getsetprops())
-					print('Font: %s' % f.BaseFont)
+					#print('Font: %s' % f.BaseFont)
 					#print('Size: %s' % font['size'])
 
 					#if f.Subtype in ('Type1', 'Type3', 'TrueType'):
