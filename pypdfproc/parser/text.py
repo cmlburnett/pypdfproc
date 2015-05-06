@@ -115,9 +115,9 @@ tokens = (
 t_DICT_START =	r'\<\<'
 t_DICT_END =	r'\>\>'
 t_ARR_START =	r'\['
-t_ARR_END =	r'\]'
+t_ARR_END =		r'\]'
 t_LIT_START =	r'\('
-t_LIT_END =	r'\)'
+t_LIT_END =		r'\)'
 
 t_BT =		r'BT' # Begin text object (5.3; pg 405)
 t_ET =		r'ET' # End text object (5.3; pg 405)
