@@ -732,6 +732,12 @@ class PDFTokenizer:
 			else:
 				return value
 
+		elif klass == _pdf.GraphicsState:
+			if isinstance(value, _pdf.IndirectObject):
+				pass
+			else:
+				return value
+
 		elif klass == _pdf.XObjectImage:
 			if isinstance(value, _pdf.IndirectObject):
 				pass

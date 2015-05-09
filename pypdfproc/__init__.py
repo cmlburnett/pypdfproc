@@ -108,6 +108,46 @@ class PDF:
 		# Return Font1, Font3, or FontTrue object
 		return f
 
+	def GetGraphicsState(self, page, gsname):
+		"""
+		"""
+
+		# Page number provided, find corresponding page
+		if type(page) == int:
+			root = self.GetRootObject()
+			pages = root.Pages.DFSPages()
+
+			if page < 1:				raise ValueError("Page number (%d) must be a positive number" % page)
+			if page > len(pages):		raise ValueError("Page number (%d) is larger the total number of pages" % page)
+
+			# Get page (pages is zero-based and pagenum is one-based, so subtract one)
+			page = pages[page-1]
+
+		elif isinstance(page, _pdf.Page):
+			# Page supplied, nothing to get
+			pass
+
+		else:
+			raise TypeError("Unrecognized page type passed: %s" % page)
+
+		# Get resources for the page
+		recs = page.Resources
+
+		# Check that there is a font with this name for this page
+		if gsname not in recs.ExtGState:
+			raise ValueError("Unrecognize external graphics state name (%s) for page (%d)" % (gsname, page))
+
+		# Get graphics state object
+		g = recs.ExtGState[gsname]
+
+		# If it's an indirect, then fetch object
+		if isindirect(g):
+			g = self.p.GetGraphicsState(g)
+
+		# Return GraphicsState object
+		return g
+
+
 	def GetGlyph(self, page, fontname, cid):
 		# Get font just to get object ID
 		f = self.GetFont(page, fontname)
@@ -116,7 +156,7 @@ class PDF:
 		g = self.fonts.GetGlyph(f.oid, cid)
 		return g
 
-	def RenderPage(self, page):
+	def RenderPage(self, page, callback):
 		"""
 		Renders the page by processing every content command.
 		"""
@@ -158,27 +198,82 @@ class PDF:
 			if tok.type == 'q':			s.Push()
 			elif tok.type == 'Q':		s.Pop()
 
+			# Graphics state
+			elif tok.type == 'i':		s.S.flatness = tok.value[0].value
+
 			# Graphics
-			elif tok.type == 'd':		s.S.d = tok.value[0].value
+			elif tok.type == 'd':		s.S.d = (tok.value[0], tok.value[1])
 			elif tok.type == 'j':		s.S.j = tok.value[0].value
 			elif tok.type == 'J':		s.S.J = tok.value[0].value
 			elif tok.type == 'M':		s.S.M = tok.value[0].value
 			elif tok.type == 'ri':		s.S.ri = tok.value[0].value
 			elif tok.type == 'w':		s.S.w = tok.value[0].value
-			#elif tok.type == 'gs':
+			elif tok.type == 'gs':
+				gs = self.GetGraphicsState(page, tok.value[0].value)
+
+				# Order is as shown in Table 4.8 (pg 220-3) of 1.7 spec
+				if gs.LW != None:		s.S.w = gs.LW # Line width
+				if gs.LC != None:		s.S.J = gs.LC # Line cap
+				if gs.LJ != None:		s.S.j = gs.LJ # Line join
+				if gs.ML != None:		s.S.M = gs.ML # Miter limit
+				if gs.D != None:		raise NotImplementedError("Graphics state setting dash pattern not implemented yet")
+				if gs.RI != None:		s.S.ri = gs.RI # Rendering intent
+
+				if gs.OP != None and gs.op != None:
+					s.S.overprint = (gs.OP, gs.op)
+				elif gs.OP != None:
+					s.S.overprint = (gs.OP, gs.OP)
+				elif gs.op != None:
+					s.S.overprint = (s.S.overprint[0], gs.op)
+				else:
+					pass
+
+				if gs.OPM != None:		s.S.overprintmode = gs.OPM # Overprint mode
+				if gs.Font != None:
+					s.T.Tf = gs.Font[0]
+					s.T.Tfs = gs.Font[1]
+
+				if gs.BG != None:		raise NotImplementedError("Graphics state setting (BG) black-generation function not implemented yet")
+				if gs.BG2 != None:		raise NotImplementedError("Graphics state setting (BG2) black-generation function not implemented yet")
+				if gs.UCR != None:		raise NotImplementedError("Graphics state setting (UCR) undercolor-removal function not implemented yet")
+				if gs.UCR2 != None:		raise NotImplementedError("Graphics state setting (UCR2) undercolor-removal function not implemented yet")
+				if gs.TR != None:		raise NotImplementedError("Graphics state setting (TR) transfer function not implemented yet")
+				#if gs.TR2 != None:		raise NotImplementedError("Graphics state setting (TR2) transfer function not implemented yet")
+				if gs.HT != None:		raise NotImplementedError("Graphics state setting (HT) halftone not implemented yet")
+				if gs.FL != None:		s.S.flatness = gs.FL # Flatness
+				if gs.SM != None:		s.S.smoothness = gs.SM # Smoothness
+				if gs.SA != None:		s.S.strokeadjustment = gs.SA # Automatic stroke adjustment
+				if gs.BM != None:		raise NotImplementedError("Graphics state setting (BM) blend mode not implemented yet")
+				if gs.SMask != None:	raise NotImplementedError("Graphics state setting (SMask) soft mask not implemented yet")
+				if gs.CA != None:		s.S.alphaconstant = (gs.CA, s.S.alphaconstant[1]) # Alpha constant for stroking
+				if gs.ca != None:		s.S.alphaconstant = (s.S.alphaconstant[0], gs.ca) # Alpha constant for non-stroking
+				if gs.AIS != None:		s.S.alphasource = gs.AIS # Alpha mode
+				if gs.TK != None:		raise NotImplementedError("Graphics state setting (TK) text knockout flag not implemented yet")
 
 			elif tok.type == 'l':		s.S.do_l(tok.value[0].value, tok.value[1].value)
 			elif tok.type == 'm':		s.S.do_m(tok.value[0].value, tok.value[1].value)
+			elif tok.type == 'F':		pass
+			elif tok.type == 'f':		pass
+			elif tok.type == 'S':		pass
+			elif tok.type == 's':		pass
 			elif tok.type == 'n':		pass
 			elif tok.type == 're':		s.S.do_re(*[v.value for v in tok.value])
 			elif tok.type == 'W':		pass
 			elif tok.type == 'W*':		pass
+
+			elif tok.type == 'Do':		pass # Paint Xobject named by tok.value[0].value
 
 			# Colorspaces
 			elif tok.type == 'cs':		s.S.colorspace = (s.S.colorspace[0], tok.value[0].value)
 			elif tok.type == 'CS':		s.S.colorspace = (tok.value[0].value, s.S.colorspace[1])
 			elif tok.type == 'sc':		s.S.color = (s.S.color[0], tok.value[0].value)
 			elif tok.type == 'SC':		s.S.color = (tok.value[0].value, s.S.color[1])
+			elif tok.type == 'G':		s.S.do_G(tok.value[0].value)
+			elif tok.type == 'g':		s.S.do_g(tok.value[0].value)
+			elif tok.type == 'RG':		s.S.do_RG(*[t.value for t in tok.value])
+			elif tok.type == 'rg':		s.S.do_rg(*[t.value for t in tok.value])
+			elif tok.type == 'K':		s.S.do_K(*[t.value for t in tok.value])
+			elif tok.type == 'k':		s.S.do_k(*[t.value for t in tok.value])
 
 			# Transforms
 			elif tok.type == 'cm':		s.S.cm = parser.Mat3x3(*[v.value for v in tok.value]) # Six numbers representing the matrix
@@ -209,15 +304,20 @@ class PDF:
 							m = parser.Mat3x3(s.T.Tfs*s.T.Tz,0, 0,s.T.Tfs, 0,s.T.Tr) * s.T.Tm * s.S.cm
 							#print("<%.2f, %.2f> '%s'" % (m.E, m.F, g.unicode))
 
+							callback('glyph draw', (m.E, m.F), g)
+
 							# Adjust for width of glyph
 							s.T.do_Tj(None, g)
 
-			elif tok.type == 'TL':		s.S.TL = tok.value[0].value
-			elif tok.type == 'Tm':		s.S.Tm = parser.Mat3x3(*[v.value for v in tok.value]) # Six numbers representing the Tm matrix
-			elif tok.type == 'Tr':		s.S.Tr = tok.value[0].value
-			elif tok.type == 'Ts':		s.S.Ts = tok.value[0].value
-			elif tok.type == 'Tw':		s.S.Tw = tok.value[0].value
-			elif tok.type == 'Tz':		s.S.Tz = tok.value[0].value
+			elif tok.type == 'TL':		s.T.TL = tok.value[0].value
+			elif tok.type == 'Tm':		s.T.Tm = parser.Mat3x3(*[v.value for v in tok.value]) # Six numbers representing the Tm matrix
+			elif tok.type == 'Tr':		s.T.Tr = tok.value[0].value
+			elif tok.type == 'Ts':		s.T.Ts = tok.value[0].value
+			elif tok.type == 'Tw':		s.T.Tw = tok.value[0].value
+			elif tok.type == 'Tz':		s.T.Tz = tok.value[0].value
+			elif tok.type == 'Td':		s.T.do_Td(tok.value[0].value, tok.value[1].value)
+			elif tok.type == 'TD':		s.T.do_TD(tok.value[0].value, tok.value[1].value)
+			elif tok.type == 'Tstar':	s.T.do_Tstar()
 
 			else:
 				raise ValueError("Cannot render '%s' token yet" % tok.type)
@@ -435,10 +535,14 @@ class FontCache:
 	# Glyph map: maps (object id, generation) to dictionary of glyphs indexed by CID
 	glyph_map = None
 
+	# Differences array maps: maps (object id, generation) of FontEncoding object to map dictionary (made by DifferencesArrayToMap)
+	diff_map = None
+
 	def __init__(self, pdf):
 		self.pdf = pdf
 		self.font_map = {}
 		self.glyph_map = {}
+		self.diff_map = {}
 
 	def GetGlyph(self, oid, cid):
 		# Get font from PDF or cache
@@ -455,6 +559,8 @@ class FontCache:
 			# Getting glyph differs with each font type
 			if f.Subtype == 'TrueType':
 				g = self.GetGlyph_TrueType(f, cid)
+			elif f.Subtype == 'Type1':
+				g = self.GetGlyph_Type1(f, cid)
 			else:
 				raise ValueError("Unknown font type: %s" % f.Subtype)
 
@@ -462,6 +568,9 @@ class FontCache:
 
 		# Return Glyph object
 		return self.glyph_map[cid]
+
+	def GetGlyph_Type1(self, f, cid):
+		return self.GetGlyph_TrueType(f, cid)
 
 	def GetGlyph_TrueType(self, f, cid):
 		g = Glyph(cid)
@@ -481,8 +590,18 @@ class FontCache:
 			else:
 				raise ValueError("Unrecognized encoding '%s' for font: %s" % (enc, f))
 
+		elif isinstance(enc, _pdf.FontEncoding):
+			if enc.oid not in self.diff_map:
+				self.diff_map[ enc.oid ] = DifferencesArrayToMap(enc.Differences)
+
+			g.unicode = self.diff_map[ enc.oid ][cid]
+
 		else:
 			raise NotImplementedError()
+
+		# FIXME: not long-term solution
+		if g.unicode in diffmap:
+			g.unicode = diffmap[g.unicode]
 
 		return g
 
@@ -542,6 +661,9 @@ diffmap['emdash'] = '\u2014'
 diffmap['parenleft'] = '('
 diffmap['parenright'] = ')'
 diffmap['bullet'] = '\u2022'
+diffmap['bracketleft'] = '['
+diffmap['bracketright'] = ']'
+diffmap['equal'] = '='
 
 diffmap['one'] = '1'
 diffmap['two'] = '2'

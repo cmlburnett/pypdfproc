@@ -33,6 +33,11 @@ RI_AbsoluteColorimetric = 0
 RI_RelativeColorimetric = 1
 RI_Saturation = 2
 RI_Perception = 3
+RI_MAP = {}
+RI_MAP['AbsoluteColorimetric'] = RI_AbsoluteColorimetric
+RI_MAP['RelativeColorimetric'] = RI_RelativeColorimetric
+RI_MAP['Saturation'] = RI_Saturation
+RI_MAP['Perception'] = RI_Perception
 
 
 # Blend mode: Table 7.2 (pg 520-2) of 1.7 spec
@@ -120,10 +125,10 @@ class State:
 		self.startpos = Pos.Origin()
 		self.pos = Pos.Origin()
 
-		self.ctm = Mat3x3.Identity()
+		self.cm = Mat3x3.Identity()
 		self.clippath = []
-		self.colorspace = (CS_DeviceGray, CS_DeviceGray)
-		self.color = (None, None)
+		self.colorspace = (CS_DeviceGray, CS_DeviceGray) # (Stroking, non-stroking)
+		self.color = (None, None) # (Stroking, non-stroking)
 		self.text = TextState()
 		self.linewidth = 1.0
 		self.linecap = LC_Butt
@@ -134,8 +139,13 @@ class State:
 		self.strokeadjustment = False
 		self.blendmode = BM_Normal
 		self.softmask = None
-		self.alphaconstant = 1.0
+		self.alphaconstant = (1.0, 1.0) # (Stroking, non-stroking)
 		self.alphasource = False
+		# TODO: above should be properties below
+
+		self.overprint = (False,False) # (Stroking, non-stroking)
+		self.overprintmode = 0 # 1 == True, 0 == False
+		self.flatness = 1.0
 
 	def Copy(self):
 		return copy.deepcopy(self)
@@ -150,30 +160,50 @@ class State:
 
 	# Graphics state
 
-	def get_d(self):		return self._dashpattern
-	def set_d(self,v):		self._dashpattern = v
+	def get_d(self):				return self._dashpattern
+	def set_d(self,v):				self._dashpattern = v
 	dashpattern = property(get_d, set_d, doc="d -- Dash pattern")
 
-	def get_j(self):		return self._linejoin
-	def set_j(self,v):		self._linejoin = v
+	def get_j(self):				return self._linejoin
+	def set_j(self,v):				self._linejoin = v
 	linejoin = property(get_j, set_j, doc="j -- Line join")
 
-	def get_J(self):		return self._linecap
-	def set_J(self,v):		self._linecap = v
+	def get_J(self):				return self._linecap
+	def set_J(self,v):				self._linecap = v
 	linecap = property(get_J, set_J, doc="J -- Line cap")
 
-	def get_M(self):		return self._miterlimit
-	def set_M(self,v):		self._miterlimit = v
+	def get_M(self):				return self._miterlimit
+	def set_M(self,v):				self._miterlimit = v
 	miterlimit = property(get_M, set_M, doc="M -- Miter limit")
 
-	def get_ri(self):		return self._miterlimit
-	def set_ri(self,v):		self._miterlimit = v
-	miterlimit = property(get_ri, set_ri, doc="ri -- riiter limit")
+	def get_ri(self):				return self._renderingintent
+	def set_ri(self,v):
+		if type(v) == int:
+			self._renderingintent = v
+		elif type(v) == str:
+			if v not in RI_MAP:
+				raise ValueError("Unrecognized rendering intent value: '%s'" % v)
+			self._renderingintent = RI_MAP[v]
+		else:
+			raise TypeError("Unrecognized type for rendering intent: '%s'" % v)
+	renderingintent = property(get_ri, set_ri, doc="ri -- Rendering intent")
 
-	def get_w(self):		return self._linewidth
-	def set_w(self,v):		self._linewidth = v
+	def get_w(self):				return self._linewidth
+	def set_w(self,v):				self._linewidth = v
 	linewidth = property(get_w, set_w, doc="w -- Line width")
 
+
+	def get_overprint(self):		return self._overprint
+	def set_overprint(self,v):		self._overprint = (bool(v[0]), bool(v[1]))
+	overprint = property(get_overprint, set_overprint, doc="Overprint")
+
+	def get_overprintmode(self):	return self._overprintmode
+	def set_overprintmode(self,v):	self._overprintmode = bool(v)
+	overprintmode = property(get_overprintmode, set_overprintmode, doc="Overprint")
+
+	def get_flatness(self):			return self._flatness
+	def set_flatness(self,v):		self._flatness = bool(v)
+	flatness = property(get_flatness, set_flatness, doc="i -- Flatness")
 
 	# Graphics
 
@@ -204,8 +234,30 @@ class State:
 		# End subpath
 		self.startpos = None
 
-	# Colorspaces
+	def do_Do(self, name):
+		raise NotImplementedError()
 
+	# Colorspaces
+	def do_G(self, v):
+		self.colorspace = (CS_DeviceGray, self.colorspace[1])
+		self.color = (v, self.color[1])
+	def do_g(self, v):
+		self.colorspace = (self.colorspace[0], CS_DeviceGray)
+		self.color = (self.color[0], v)
+
+	def do_RG(self, r,g,b):
+		self.colorspace = (CS_DeviceRGB, self.colorspace[1])
+		self.color = ( (r,g,b), self.color[1])
+	def do_rg(self, r,g,b):
+		self.colorspace = (self.colorspace[0], CS_DeviceRGB)
+		self.color = (self.color[0], (r,g,b))
+
+	def do_K(self, c,m,y,k):
+		self.colorspace = (CS_DeviceCMYK, self.colorspace[1])
+		self.color = ( (c,m,y,k), self.color[1])
+	def do_k(self, c,m,y,k):
+		self.colorspace = (self.colorspace[0], CS_DeviceCMYK)
+		self.color = (self.color[0], (c,m,y,k))
 
 	# Transformations
 
@@ -247,9 +299,12 @@ class TextState:
 	def set_Tc(self,v):		self._Tc = float(v)
 	Tc = property(get_Tc, set_Tc, "Tc -- Character spacing")
 
+	# NB: if set via Tf command then this is a string representing a font name in the page's resources
+	# or it could be an indirect object id as set through external graphics state
+	# Rendering code should handle both values
 	def get_Tf(self):		return self._Tf
 	def set_Tf(self,v):		self._Tf = v
-	Tf = property(get_Tf, set_Tf, doc="Tf -- Font name")
+	Tf = property(get_Tf, set_Tf, doc="Tf -- Font name (Indirect objid or resource name)")
 
 	def get_Tfs(self):		return self._Tfs
 	def set_Tfs(self,v):	self._Tfs = float(v)
@@ -288,7 +343,7 @@ class TextState:
 		self.Tm = self.Tlm = Mat3x3(1,0, 0,1, x,y) * self.Tlm
 
 	def do_TD(self, x,y):
-		self.do_TL(-y)
+		self.TL = -y
 		self.do_Td(x,y)
 
 	def do_Tj(self, w, glyph):
@@ -299,11 +354,13 @@ class TextState:
 		# Adjust Tm based on width from TJ or glyph from TJ/Tj
 		if w != None:
 			# Assuming horizontal (i.e., ignoring self.Tr)
-			tx = ((0.0 - w)/1000.0*self.Tfs + self.Tc + self.Tw)*(self.Tz / 100.0)
+			tx = ((0.0 - w)/1000.0*self.Tfs)*(self.Tz / 100.0)
 			#print(['tx w', tx, w, self.Tfs, self.Tc, self.Tw, self.Tz])
 
 			self.Tm = Mat3x3(1,0, 0,1, tx,0) * self.Tm
 		else:
+			# FIXME: only add in Tw if the glyph is a space
+
 			# Assuming horizontal (i.e., ignoring self.Tr)
 			tx = ((glyph.width - 0.0)/1000.0*self.Tfs + self.Tc + self.Tw)*(self.Tz / 100.0)
 			#print(['tx g', tx, glyph.width, self.Tfs, self.Tc, self.Tw, self.Tz])
