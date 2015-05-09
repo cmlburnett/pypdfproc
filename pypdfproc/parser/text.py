@@ -197,7 +197,7 @@ t_W =		r'W'  # Modify current clipping path by intersecting with current path us
 t_Wstar =	r'W\*'# Modify current clipping path by intersecting with current path using even-odd rule (4.4.3; pg 235)
 
 
-t_Do =		r'Do'
+t_Do =		r'Do' # Paint specified XObject (Table 4.37; pg 332)
 
 # Import that this is before t_INT otherwise something like "13.0" will match t_INT before t_FLOAT and
 # result in (INT, 13) and (FLOAT, 0.0) by matching "13" and ".0" respectively
