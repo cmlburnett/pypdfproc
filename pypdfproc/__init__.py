@@ -96,7 +96,7 @@ class PDF:
 
 		# Check that there is a font with this name for this page
 		if fontname not in recs.Font:
-			raise ValueError("Unrecognize font name (%s) for page (%d)" % (fontname, pagenum))
+			raise ValueError("Unrecognize font name (%s) for page (%d)" % (fontname, page))
 
 		# Get font object
 		f = recs.Font[fontname]
