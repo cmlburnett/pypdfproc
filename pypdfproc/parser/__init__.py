@@ -325,6 +325,10 @@ class PDFTokenizer:
 		else:
 			raise NotImplementedError()
 
+		# Set object ID
+		if isinstance(o, _pdf.PDFBase):
+			o.oid = (objid, generation)
+
 		# Return processed token stream
 		return o
 

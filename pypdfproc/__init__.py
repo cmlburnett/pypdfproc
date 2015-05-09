@@ -28,6 +28,9 @@ class PDF:
 	# PDF parser (from pdf.py)
 	p = None
 
+	# Font cache keeps track of glyph information, etc.
+	fonts = None
+
 	def __init__(self, fname):
 		# Copy the file name
 		self.fname = fname
@@ -39,6 +42,8 @@ class PDF:
 		# Open the file and initialize it (xref/trailer reading)
 		self.p = parser.PDFTokenizer(self.m)
 		self.p.Initialize()
+
+		self.fonts = FontCache(self)
 
 	def Close(self):
 		self.m.close()
@@ -103,6 +108,14 @@ class PDF:
 		# Return Font1, Font3, or FontTrue object
 		return f
 
+	def GetGlyph(self, page, fontname, cid):
+		# Get font just to get object ID
+		f = self.GetFont(page, fontname)
+
+		# Glyph is irrespective of page, just font and character ID
+		g = self.fonts.GetGlyph(f.oid, cid)
+		return g
+
 	def RenderPage(self, page):
 		"""
 		Renders the page by processing every content command.
@@ -140,34 +153,71 @@ class PDF:
 
 		toks = tt.TokenizeString(ct)['tokens']
 		for tok in toks:
-			print(['tok', tok])
+			#print(['tok', tok])
 			# Save and restore state
 			if tok.type == 'q':			s.Push()
 			elif tok.type == 'Q':		s.Pop()
 
 			# Graphics
+			elif tok.type == 'd':		s.S.d = tok.value[0].value
+			elif tok.type == 'j':		s.S.j = tok.value[0].value
+			elif tok.type == 'J':		s.S.J = tok.value[0].value
+			elif tok.type == 'M':		s.S.M = tok.value[0].value
+			elif tok.type == 'ri':		s.S.ri = tok.value[0].value
+			elif tok.type == 'w':		s.S.w = tok.value[0].value
+			#elif tok.type == 'gs':
+
+			elif tok.type == 'l':		s.S.do_l(tok.value[0].value, tok.value[1].value)
+			elif tok.type == 'm':		s.S.do_m(tok.value[0].value, tok.value[1].value)
+			elif tok.type == 'n':		pass
 			elif tok.type == 're':		s.S.do_re(*[v.value for v in tok.value])
 			elif tok.type == 'W':		pass
 			elif tok.type == 'W*':		pass
-			elif tok.type == 'n':		pass
 
 			# Colorspaces
-			elif tok.type == 'cs':		pass
-			elif tok.type == 'CS':		pass
-			elif tok.type == 'sc':		pass
-			elif tok.type == 'SC':		pass
+			elif tok.type == 'cs':		s.S.colorspace = (s.S.colorspace[0], tok.value[0].value)
+			elif tok.type == 'CS':		s.S.colorspace = (tok.value[0].value, s.S.colorspace[1])
+			elif tok.type == 'sc':		s.S.color = (s.S.color[0], tok.value[0].value)
+			elif tok.type == 'SC':		s.S.color = (tok.value[0].value, s.S.color[1])
 
 			# Transforms
 			elif tok.type == 'cm':		s.S.cm = parser.Mat3x3(*[v.value for v in tok.value]) # Six numbers representing the matrix
 
 			# Text
-			elif tok.type == 'BT':		pass
-			elif tok.type == 'ET':		pass
-			elif tok.type == 'Tf':		s.S.Tf = (tok.value[0].value, tok.value[1].value) # Font name and font size (int or float)
-			elif tok.type == 'Tj':		pass
-			elif tok.type == 'TJ':		pass
-			elif tok.type == 'Tm':		pass
-			elif tok.type == 'Tc':		pass
+			elif tok.type == 'BT':		s.T.text_begin()
+			elif tok.type == 'ET':		s.T.text_end()
+
+			elif tok.type == 'Tc':		s.T.Tc = tok.value[0].value
+			elif tok.type == 'Tf':
+				s.T.Tf = tok.value[0].value # Font name
+				s.T.Tfs = tok.value[1].value # Font size
+			elif tok.type in ('Tj', 'TJ'):
+				for subtok in tok.value:
+					#print(['stok', subtok])
+
+					if subtok.type in ('INT', 'FLOAT'):
+						# Adjust character spacing
+						s.T.do_Tj(subtok.value, None)
+					else:
+						txt = GetTokenString(subtok)
+
+						for t in txt:
+							g = self.GetGlyph(page, s.T.Tf, ord(t))
+							#print(['t', t, g.width, g.unicode])
+
+							# Calculate current drawing position before updating Tm
+							m = parser.Mat3x3(s.T.Tfs*s.T.Tz,0, 0,s.T.Tfs, 0,s.T.Tr) * s.T.Tm * s.S.cm
+							#print("<%.2f, %.2f> '%s'" % (m.E, m.F, g.unicode))
+
+							# Adjust for width of glyph
+							s.T.do_Tj(None, g)
+
+			elif tok.type == 'TL':		s.S.TL = tok.value[0].value
+			elif tok.type == 'Tm':		s.S.Tm = parser.Mat3x3(*[v.value for v in tok.value]) # Six numbers representing the Tm matrix
+			elif tok.type == 'Tr':		s.S.Tr = tok.value[0].value
+			elif tok.type == 'Ts':		s.S.Ts = tok.value[0].value
+			elif tok.type == 'Tw':		s.S.Tw = tok.value[0].value
+			elif tok.type == 'Tz':		s.S.Tz = tok.value[0].value
 
 			else:
 				raise ValueError("Cannot render '%s' token yet" % tok.type)
@@ -376,6 +426,90 @@ class PDF:
 		t = page.Thumb
 		raise NotImplementedError()
 
+class FontCache:
+	pdf = None
+
+	# Font map: maps (object id, generation) to Font object
+	font_map = None
+
+	# Glyph map: maps (object id, generation) to dictionary of glyphs indexed by CID
+	glyph_map = None
+
+	def __init__(self, pdf):
+		self.pdf = pdf
+		self.font_map = {}
+		self.glyph_map = {}
+
+	def GetGlyph(self, oid, cid):
+		# Get font from PDF or cache
+		if oid not in self.font_map:
+			f = self.pdf.p.GetObject(oid[0], oid[1])
+			self.font_map[oid] = f
+			self.glyph_map[oid] = {}
+		else:
+			f = self.font_map[oid]
+
+
+		# Get glyph if not cached
+		if cid not in self.glyph_map:
+			# Getting glyph differs with each font type
+			if f.Subtype == 'TrueType':
+				g = self.GetGlyph_TrueType(f, cid)
+			else:
+				raise ValueError("Unknown font type: %s" % f.Subtype)
+
+			self.glyph_map[cid] = g
+
+		# Return Glyph object
+		return self.glyph_map[cid]
+
+	def GetGlyph_TrueType(self, f, cid):
+		g = Glyph(cid)
+		g.width = f.Widths[ cid - f.FirstChar ]
+
+		fd = f.FontDescriptor
+		enc = f.Encoding
+
+		if type(enc) == str:
+			if enc == 'MacRomanEncoding':
+				g.unicode = chr(cid).encode('latin-1').decode('mac_roman')
+			elif enc == 'WinAnsiEncoding':
+				# Close enough to WinAnsiEncoding
+				g.unicode = chr(cid)
+			elif enc == 'Identity-H':
+				g.unicode = chr(cid)
+			else:
+				raise ValueError("Unrecognized encoding '%s' for font: %s" % (enc, f))
+
+		else:
+			raise NotImplementedError()
+
+		return g
+
+class Glyph:
+	def __init__(self, cid):
+		self.cid = cid
+		self.unicode = None
+		self.width = 0
+
+	def __repr__(self):
+		return str(self)
+	def __str__(self):
+		return "<Glyph cid=%d unicode='%s' width=%d>" % (self.cid, self.unicode, self.width or 0)
+
+	def get_cid(self):				return self._cid
+	def set_cid(self,v):			self._cid = v
+	cid = property(get_cid, set_cid, doc="Character ID")
+
+	def get_unicode(self):			return self._uni
+	def set_unicode(self,v):		self._uni = v
+	uni = property(get_unicode, set_unicode, doc="Glyph unicode")
+
+	def get_width(self):			return self._width
+	def set_width(self,v):			self._width = float(v)
+	width = property(get_width, set_width, doc="Glyph width")
+
+
 def GetTokenString(tok, bytesize=None):
 	if tok.type == 'LIT':
 		l = tok.value
@@ -389,7 +523,7 @@ def GetTokenString(tok, bytesize=None):
 
 		ret = SplitHex(h, bytesize)
 	else:
-		raise TypeError("Unrecognized Tj token type: %s" % tok.value[0].type)
+		raise TypeError("Unrecognized Tj token type: %s" % tok.type)
 
 	#print(ret)
 	#print([ord(c) for c in ret])

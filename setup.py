@@ -41,9 +41,10 @@ data_files = [
 	]),
 	('pypdfproc/parser', [
 							'pypdfproc/parser/__init__.py',
-							'pypdfproc/parser/pdf.py',
-							'pypdfproc/parser/text.py',
 							'pypdfproc/parser/cmap.py',
+							'pypdfproc/parser/pdf.py',
+							'pypdfproc/parser/state.py',
+							'pypdfproc/parser/text.py',
 	]),
 ]
 scripts = []

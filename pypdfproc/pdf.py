@@ -83,8 +83,8 @@ class PDF:
 
 
 class PDFBase:
-	# Nothing yet
-	pass
+	# Tuple of (object id, generation), None if no id for this object
+	oid = None
 
 # ------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
@@ -329,12 +329,19 @@ class PDFHigherBase(PDFBase):
 	def _Load(self, key, rawvalue):
 		raise NotImplementedError("Class %s does not implement _Load function to dynamically load properties" % self.__class__.__name__)
 
-	def getsetprops(self):
+	def getsetprops(self, klass=None):
 		ret = {}
 
+		if klass == None:
+			klass = self.__class__
+
 		for k in self.__dict__:
-			if k in self.__class__.__dict__:
+			if k in klass.__dict__:
 				ret[k] = self.__dict__[k]
+
+		# Iterate through base classes
+		for k in klass.__bases__:
+			ret.update( self.getsetprops(k) )
 
 		return ret
 
@@ -613,16 +620,7 @@ class Font3(PDFHigherBase):
 
 class FontTrue(Font1):
 	# Same as Font1 with interpretive differences (5.5.2, pg 418)
-	_Type = None
-	_Subtype = None
-	_Name = None
-	_BaseFont = None
-	_FirstChar = None
-	_LastChar = None
-	_Widths = None
-	_FontDescriptor = None
-	_Encoding = None
-	_ToUnicode = None
+	pass
 
 class FontCID0(PDFHigherBase):
 	# Table 51.4 (pg 436-7) of 1.7 spec
