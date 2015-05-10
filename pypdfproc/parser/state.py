@@ -207,6 +207,15 @@ class State:
 
 	# Graphics
 
+	def do_h(self):
+		# Close path and draw line to starting position if not there already
+		if self.pos != self.startpos:
+			self.do_l(self.startpos[0], self.startpos[1])
+
+		self.startpos = None
+
+		# Draw path
+
 	def do_re(self, x,y, w,h):
 		if self.startpos == None:
 			self.startpos = Pos(x,y)
@@ -220,10 +229,23 @@ class State:
 
 	def do_m(self, x,y):
 		self.pos = Pos(x,y)
+		self.startpos = self.pos
 
 	def do_l(self, x,y):
 		# draw from self.pos to Pos(x,y)
 		self.pos = Pos(x,y)
+
+	def do_c(self, x1,y1, x2,y2, x3,y3):
+		# draw Bezier from self.pos to (x3,y3) with two control points (x1,y1) and (x2,y2)
+		self.pos = Pos(x3,y3)
+
+	def do_v(self, x2,y2, x3,y3):
+		# draw Bezier from self.pos to (x3,y3) with two control points self.pos and (x2,y2)
+		self.pos = Pos(x3,y3)
+
+	def do_y(self, x1,y1, x3,y3):
+		# draw Bezier from self.pos to (x3,y3) with two control points (x1,y1) and (x3,y3)
+		self.pos = Pos(x3,y3)
 
 	def do_h(self):
 		# End subpath if one is defined
