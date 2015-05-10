@@ -440,6 +440,12 @@ class FontCache:
 		if type(f.Encoding) == str:
 			encmap = _encodingmap.MapCIDToGlyphName(f.Encoding)
 
+			# Bounds checking since these error strings are more descriptive than KeyErrors
+			if cid not in encmap:
+				raise ValueError("Unable to find character code %d ('%s') in encoding map for encoding %s" % (cid, chr(cid), f.Encoding))
+			if cid - f.FirstChar > len(f.Widths):
+				raise KeyError("Character code (%d) from the first character (%d) exceeds the widths array (len=%d)" % (cid, f.FirstChar, len(f.Widths)))
+
 			# Character code to glyph name to unicode
 			gname = encmap[cid]
 			u = _encodingmap.MapGlyphNameToUnicode(gname)
