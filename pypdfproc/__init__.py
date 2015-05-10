@@ -255,8 +255,12 @@ class PDF:
 				if gs.AIS != None:		s.S.alphasource = gs.AIS # Alpha mode
 				if gs.TK != None:		raise NotImplementedError("Graphics state setting (TK) text knockout flag not implemented yet")
 
-			elif tok.type == 'l':		s.S.do_l(tok.value[0].value, tok.value[1].value)
-			elif tok.type == 'm':		s.S.do_m(tok.value[0].value, tok.value[1].value)
+			elif tok.type == 'h':		s.S.do_h()
+			elif tok.type == 'l':		s.S.do_l(*[v.value for v in tok.value])
+			elif tok.type == 'm':		s.S.do_m(*[v.value for v in tok.value])
+			elif tok.type == 'c':		s.S.do_c(*[v.value for v in tok.value])
+			elif tok.type == 'v':		s.S.do_v(*[v.value for v in tok.value])
+			elif tok.type == 'y':		s.S.do_y(*[v.value for v in tok.value])
 			elif tok.type == 'Fstar':	pass
 			elif tok.type == 'fstar':	pass
 			elif tok.type == 'F':		pass
@@ -293,6 +297,8 @@ class PDF:
 			elif tok.type == 'Tf':
 				s.T.Tf = tok.value[0].value # Font name
 				s.T.Tfs = tok.value[1].value # Font size
+
+				callback(s, 'change font', page, s.T.Tf, s.T.Tfs)
 			elif tok.type in ('Tj', 'TJ'):
 				for subtok in tok.value:
 					#print(['stok', subtok])
@@ -301,7 +307,7 @@ class PDF:
 						# Adjust character spacing
 						s.T.do_Tj(subtok.value, None)
 
-						# TODO: If sufficient width to constitute a space, then inject that space
+						callback(s, 'space draw', page, subtok.value)
 					else:
 						if subtok.type == 'HEXSTRING':
 							f = self.GetFont(page, s.T.Tf)
@@ -316,14 +322,15 @@ class PDF:
 							txt = GetTokenString(subtok)
 
 						for t in txt:
+							#print(['t', s.T.Tf, t, ord(t)])
 							g = self.GetGlyph(page, s.T.Tf, ord(t))
-							#print(['t', t, g.width, g.unicode])
+							#print(['g', t, g.width, g.unicode])
 
 							# Calculate current drawing position before updating Tm
 							m = parser.Mat3x3(s.T.Tfs*s.T.Tz,0, 0,s.T.Tfs, 0,s.T.Tr) * s.T.Tm * s.S.cm
 							#print("<%.2f, %.2f> '%s'" % (m.E, m.F, g.unicode))
 
-							callback('glyph draw', (m.E, m.F), g)
+							callback(s, 'glyph draw', page, (m.E, m.F), g)
 
 							# Adjust for width of glyph
 							s.T.do_Tj(None, g)
@@ -337,6 +344,8 @@ class PDF:
 			elif tok.type == 'Td':		s.T.do_Td(tok.value[0].value, tok.value[1].value)
 			elif tok.type == 'TD':		s.T.do_TD(tok.value[0].value, tok.value[1].value)
 			elif tok.type == 'Tstar':	s.T.do_Tstar()
+			elif tok.type == 'BDC':		pass
+			elif tok.type == 'EMC':		pass
 
 			else:
 				raise ValueError("Cannot render '%s' token yet" % tok.type)
@@ -355,22 +364,45 @@ class PDF:
 		# Final text and callback state
 		fulltxt = []
 		txt = []
-		state = {'y': -1.0}
+		state = {'y': -1.0, 'widths': None}
 
-		def cb(action, *args):
-			if action != 'glyph draw':
-				return
+		def cb(s, action, page, *args):
+			if action == 'change font':
+				Tf = args[0]
+				Tfs = args[1]
 
-			x,y = args[0]
-			g = args[1]
+				f = self.GetFont(page, Tf)
 
-			# New row then add newline
-			if state['y'] != y:
-				txt.append('\n')
-				state['y'] = y
+				w = f.Widths
+				w = [v for v in w if v != 0]
+				state['widths'] = {'avg': sum(w)/float(len(w)), 'min': min(w), 'max': max(w)}
 
-			# Add character
-			txt.append(g.unicode)
+			elif action == 'glyph draw':
+				x,y = args[0]
+				g = args[1]
+
+				# New row then add newline
+				if state['y'] != y:
+					txt.append('\n')
+					state['y'] = y
+
+				# Add character
+				txt.append(g.unicode)
+
+			elif action == 'space draw':
+				w = args[0]
+
+				# If the inter-character spacing is >50% of the average glyph width (both are in text space)
+				# then assume an implied space
+				#
+				# NB: 50% is completely arbitrary; could be more thorough and find the width for a space character instead...
+				if abs(w) > 0.5*state['widths']['avg']:
+					txt.append(' ')
+
+
+			else:
+				# Don't care
+				pass
 
 		# Iterate through pages
 		for page in pages:
@@ -545,7 +577,7 @@ class FontCache:
 			# Get differences mapping and CMap function
 			if enc.oid not in self.diff_map:
 				self.diff_map[ enc.oid ] = DifferencesArrayToMap(enc.Differences)
-			if not cmap.CMapper:
+			if cmap and not cmap.CMapper:
 				cmap.CMapper = parser.CMapTokenizer().BuildMapper(cmap.Stream)
 
 			# Bounds checking since these error strings are more descriptive than KeyErrors
@@ -564,6 +596,8 @@ class FontCache:
 
 			w = f.Widths[ cid - f.FirstChar ]
 
+			# TODO: catch fi, fl, etc. ligatures here???
+
 			g = Glyph(cid)
 			g.unicode = u
 			g.width = w
@@ -574,6 +608,33 @@ class FontCache:
 			return g
 		else:
 			raise TypeError("Unrecognized font encoding type: '%s'" % f.Encoding)
+
+	def MissingGlyphName(self, f, encmap, cid, gname):
+		# Try the cmap
+		if f.ToUnicode:
+			try:
+				return f.ToUnicode.CMapper(cid)
+			except KeyError:
+				# Not there, try again
+				pass
+
+		if f.BaseFont != None:
+			if f.BaseFont.endswith('AdvP4C4E74'):
+				if gname == 'C0':		return '\u2212' # Minus sign
+				elif gname == 'C6':		return '\u00B1' # Plus-mins sign
+				elif gname == 'C14':	return '\u00B0' # Degree symbol
+				elif gname == 'C15':	return '\u2022' # Bullet
+				elif gname == 'C211':	return '\u00A9' # Copyright
+			if f.BaseFont.endswith('AdvPSSym'):
+				if gname == 'C211':		return '\u00A9' # Copyright
+
+		print(['f', f.getsetprops()])
+		print(['enc', f.Encoding.getsetprops()])
+		print(['cmap', f.ToUnicode])
+		print(['encmap', encmap])
+		print(['gname', gname])
+
+		raise NotImplementedError()
 
 class Glyph:
 	def __init__(self, cid):
@@ -598,6 +659,17 @@ class Glyph:
 	def set_width(self,v):			self._width = float(v)
 	width = property(get_width, set_width, doc="Glyph width")
 
+
+# FIXME: not the way to do this I don't think
+unicode_mapdat = {}
+#unicode_mapdat[8211] = "-"		# x2013 is EN DASH but can just use hyphen
+unicode_mapdat[8217] = "'"		# x2019 is RIGHT SINGLE QUATATION MARK but is often used as an apostrophe
+unicode_mapdat[64428] = "ff"	# xFB00 is LATIN SMALL LIGATURE FF is sometimes used instead of "ff" for some reason
+unicode_mapdat[64429] = "fi"	# xFB01 is LATIN SMALL LIGATURE FI is sometimes used instead of "fi" for some reason
+unicode_mapdat[64430] = "fl"	# xFB02 is LATIN SMALL LIGATURE FL is sometimes used instead of "fl" for some reason
+unicode_mapdat[64431] = "ffi"	# xFB03 is LATIN SMALL LIGATURE FFI is sometimes used instead of "ffi" for some reason
+unicode_mapdat[64432] = "ffl"	# xFB04 is LATIN SMALL LIGATURE FFL is sometimes used instead of "ffl" for some reason
+unicode_mapdat[64434] = "st"	# xFB06 is LATIN SMALL LIGATURE ST is sometimes used instead of "st" for some reason
 
 def GetTokenString(tok, bytesize=None):
 	if tok.type == 'LIT':
