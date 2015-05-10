@@ -332,10 +332,8 @@ class PDF:
 	def GetFullText(self):
 		"""
 		Get the full text in the document.
-		This mashes all text into one continuous string and does not subdivide the text by page, bead, column, or anything.
-		Rows of text do have newlines separating them.
-		One stream of text.
-		For example, this would be useful for making a search index.
+		This mashes all text into one continuous string with rows of text having newlines separating them.
+		Returns a list of txt streings, with one string per page.
 		"""
 
 		# Get the root object and the pages in DFS order
@@ -343,6 +341,7 @@ class PDF:
 		pages = root.Pages.DFSPages()
 
 		# Final text and callback state
+		fulltxt = []
 		txt = []
 		state = {'y': -1.0}
 
@@ -365,7 +364,11 @@ class PDF:
 		for page in pages:
 			self.RenderPage(page, cb)
 
-		return "".join(txt)
+			# Index by page
+			fulltxt.append( "".join(txt) )
+			txt.clear()
+
+		return fulltxt
 
 	def GetPageThumbnail(self, page):
 		"""
