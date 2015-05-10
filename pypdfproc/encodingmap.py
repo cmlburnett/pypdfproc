@@ -4678,7 +4678,7 @@ def MapGlyphNameToUnicode(name):
 		InitGlyphNameMap()
 
 	if name not in GlyphNameMap:
-		raise ValueError("Glyph name '%s' is not in the map" % name)
+		return None
 
 	return GlyphNameMap[name]
 

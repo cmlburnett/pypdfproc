@@ -512,6 +512,8 @@ class FontCache:
 			# Character code to glyph name to unicode
 			gname = encmap[cid]
 			u = _encodingmap.MapGlyphNameToUnicode(gname)
+			if u == None:
+				raise NotImplementedError()
 
 			# Get width based on character code
 			w = f.Widths[ cid - f.FirstChar ]
@@ -557,6 +559,9 @@ class FontCache:
 				gname = encmap[cid]
 
 			u = _encodingmap.MapGlyphNameToUnicode(gname)
+			if u == None:
+				u = self.MissingGlyphName(f, encmap, cid, gname)
+
 			w = f.Widths[ cid - f.FirstChar ]
 
 			g = Glyph(cid)
