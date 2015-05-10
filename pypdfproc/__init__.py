@@ -489,7 +489,7 @@ class FontCache:
 			if cid not in self.diff_map[enc.oid] and cid not in encmap:
 				raise ValueError("Unable to find character code %d ('%s') in differences map for encoding oid %s and base encoding '%s'" % (cid, chr(cid), f.Encoding.oid, be))
 
-			# Get glyph name from differences mapping
+			# Get glyph name from differences mapping first, but otherwise fallback on the standard encoding map
 			if cid in self.diff_map[enc.oid]:
 				gname = self.diff_map[ enc.oid ][cid]
 			else:
