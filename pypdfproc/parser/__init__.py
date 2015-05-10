@@ -672,9 +672,8 @@ class PDFTokenizer:
 		elif klass == _pdf.Resource:
 			if isinstance(value, _pdf.Dictionary) or isinstance(value, _pdf.Array):
 				return value
-			elif key == 'Font':
-				if isinstance(value, _pdf.IndirectObject):
-					return self.GetDictionary(value)
+			elif isinstance(value, _pdf.IndirectObject):
+				return self.GetDictionary(value)
 
 		elif klass == _pdf.Font0:
 			if isinstance(value, _pdf.IndirectObject):
