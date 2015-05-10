@@ -473,7 +473,7 @@ class PDFTokenizer:
 		return self._StupidObjectParser(objidgen, tokens, _pdf.PageTreeNode)
 
 	def _ParsePageTreeNodeOrPage(self, objidgen, tokens):
-		return self._ParserPageTreeNodeOrPageOject(objidgen, tokens)
+		return self._ParsePageTreeNodeOrPageOject(objidgen, tokens)
 
 	def _ParsePage(self, objidgen, tokens):
 		return self._StupidObjectParser(objidgen, tokens, _pdf.Page)
@@ -484,7 +484,7 @@ class PDFTokenizer:
 	def _ParseContent(self, objidgen, tokens):
 		return self._ParseStream(objidgen, tokens)
 
-	def _ParserPageTreeNodeOrPageOject(self, objidgen, tokens):
+	def _ParsePageTreeNodeOrPageOject(self, objidgen, tokens):
 		"""
 		PageTreeNode.Kids can be PageTreeNode or Page, so must check Type before picking klass.
 		"""
