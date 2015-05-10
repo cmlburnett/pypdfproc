@@ -474,6 +474,14 @@ class Pos:
 	def __str__(self):
 		return "(%.2f, %.2f, %.2f)" % (self.X, self.Y, self.Z)
 
+	def __eq__(a,b):
+		if b == None: return False
+		delx = a.X - b.X
+		dely = a.Y - b.Y
+
+		# Arbitrarily choose 0.0001 as the "close enough" floating value
+		return delx < 0.0001 and dely < 0.0001
+
 	@staticmethod
 	def Origin():
 		return Pos(0,0)
