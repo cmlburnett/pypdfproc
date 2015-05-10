@@ -248,7 +248,7 @@ class PDF:
 				if gs.FL != None:		s.S.flatness = gs.FL # Flatness
 				if gs.SM != None:		s.S.smoothness = gs.SM # Smoothness
 				if gs.SA != None:		s.S.strokeadjustment = gs.SA # Automatic stroke adjustment
-				if gs.BM != None:		raise NotImplementedError("Graphics state setting (BM) blend mode not implemented yet")
+				if gs.BM != None:		s.S.blendmode = gs.BM
 				if gs.SMask != None:	raise NotImplementedError("Graphics state setting (SMask) soft mask not implemented yet")
 				if gs.CA != None:		s.S.alphaconstant = (gs.CA, s.S.alphaconstant[1]) # Alpha constant for stroking
 				if gs.ca != None:		s.S.alphaconstant = (s.S.alphaconstant[0], gs.ca) # Alpha constant for non-stroking
@@ -303,7 +303,17 @@ class PDF:
 
 						# TODO: If sufficient width to constitute a space, then inject that space
 					else:
-						txt = GetTokenString(subtok)
+						if subtok.type == 'HEXSTRING':
+							f = self.GetFont(page, s.T.Tf)
+							if type(f.Encoding) == str:
+								if f.Encoding.startswith('Identity'):
+									txt = GetTokenString(subtok, bytesize=2)
+								else:
+									raise NotImplementedError("Unknown encoding for HEXSTRING: '%s'" % f.Encoding)
+							else:
+								raise NotImplementedError("Unknown encoding for HEXSTRING: '%s'" % f.Encoding)
+						else:
+							txt = GetTokenString(subtok)
 
 						for t in txt:
 							g = self.GetGlyph(page, s.T.Tf, ord(t))
@@ -401,6 +411,42 @@ class PDF:
 		t = page.Thumb
 		raise NotImplementedError()
 
+class Type0FontCache:
+	"""
+	Handle Type0 fonts.
+	More complex than simple fonts so having a dedicated structure seems reasonable.
+	"""
+
+	# Font this cachine
+	font = None
+
+	# Maps CDI to width
+	widthmap = None
+
+	def __init__(self, f):
+		self.font = f
+		self.widthmap = {}
+
+		# Index widths by CID
+		for subf in f.DescendantFonts:
+			m = CIDWidthArrayToMap(subf.W)
+			for k,v in m.items():
+				self.widthmap[k] = (v, subf)
+
+	def GetGlyph(self, cid):
+		cmap = self.font.ToUnicode
+		if not cmap.CMapper:
+			cmap.CMapper = parser.CMapTokenizer().BuildMapper(cmap.Stream)
+
+		# Map CID
+		u = cmap.CMapper(cid)
+
+		g = Glyph(cid)
+		g.width = self.widthmap[cid][0]
+		g.unicode = u
+
+		return g
+
 class FontCache:
 	pdf = None
 
@@ -418,6 +464,7 @@ class FontCache:
 		self.font_map = {}
 		self.glyph_map = {}
 		self.diff_map = {}
+		self.type0_map = {}
 
 	def GetGlyph(self, oid, cid):
 		"""
@@ -439,7 +486,20 @@ class FontCache:
 
 		# ------------------------------------------------------
 
-		if type(f.Encoding) == str:
+		if f.Subtype == 'Type0':
+			# Cache instance if not present
+			if oid not in self.type0_map:
+				self.type0_map[oid] = Type0FontCache(f)
+
+			# Get glyph
+			g = self.type0_map[oid].GetGlyph(cid)
+
+			# Cache glyph
+			self.glyph_map[oid][cid] = g
+
+			return g
+
+		elif type(f.Encoding) == str:
 			encmap = _encodingmap.MapCIDToGlyphName(f.Encoding)
 
 			# Bounds checking since these error strings are more descriptive than KeyErrors
@@ -447,6 +507,7 @@ class FontCache:
 				raise ValueError("Unable to find character code %d ('%s') in encoding map for encoding %s" % (cid, chr(cid), f.Encoding))
 			if cid - f.FirstChar > len(f.Widths):
 				raise KeyError("Character code (%d) from the first character (%d) exceeds the widths array (len=%d)" % (cid, f.FirstChar, len(f.Widths)))
+
 
 			# Character code to glyph name to unicode
 			gname = encmap[cid]
@@ -840,14 +901,29 @@ def SplitHex(txt, bytesize):
 def CIDWidthArrayToMap(arr):
 	mapdat = {}
 
-	lastcode = 0
-	for i in range(len(arr)):
-		if type(arr[i]) == int:
-			lastcode = i
-		elif isinstance(arr[i], _pdf.Array):
-			for k in range(len(arr[i])):
-				mapdat[lastcode] = arr[i][k]
-				lastcode += 1
+	i = 0
+	imax = len(arr)
+	while i < imax:
+		if type(arr[i]) == int and isinstance(arr[i+1], _pdf.Array):
+			# Base code is given first
+			basecode = arr[i]
+
+			# Then incrementally applied to each element in the array
+			for v in arr[i+1]:
+				mapdat[basecode] = v
+				basecode += 1
+
+			# Two: one for int, one for array
+			i += 2
+
+		elif type(arr[i]) == int and type(arr[i+1]) == int and type(arr[i+2]) == int:
+			# First and second number define a range, and each within the range
+			# is the same width that is the third number
+			for k in range(arr[i], arr[i+1]+1):
+				mapdat[k] = arr[i+2]
+
+			# Three: one for start index, one for end index, one for width
+			i += 3
 		else:
 			raise TypeError("Unrecognized type (%s) when iterating through CID widths array: %s" % (arr[i], arr))
 

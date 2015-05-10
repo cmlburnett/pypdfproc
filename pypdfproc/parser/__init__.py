@@ -902,10 +902,13 @@ class CMapTokenizer:
 					raise NotImplementedError("Not setup to handle bf range arrays")
 
 		def mapper(c):
-			if type(c) != str:
+			if type(c) == int:
+				cc = c
+			elif type(c) == str:
+				cc = ord(c)
+			else:
 				raise TypeError("Cannot map non-string: %s" % type(c))
 
-			cc = ord(c)
 			if cc in mapdat:
 				return mapdat[cc]
 			else:
