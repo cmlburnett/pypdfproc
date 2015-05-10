@@ -1,6 +1,6 @@
 """
-Mapping between character codes and glyph names.
-This mapping is defined in Appendix D of 1.7 spec.
+Mapping between character codes and glyph names and from glyph names to unicode values.
+This mapping is defined in Appendix D of 1.7 spec and from Adobe online.
 The mappings in the spec are defined in octal, but these are converted to decimal.
 
 The map EncodingMap is indexed by the encoding type:
@@ -16,6 +16,13 @@ EncodingMap['Win'] is a dictionary that maps available character codes to glyph 
 EncodingMap['PDF'] is a dictionary that maps available character codes to glyph names in PDFDocEncoding.
 
 For example, EncodingMap['Std'][65] yeilds 'A'.
+
+The glyph name to unicode mapping is from a semicolon-delimited list from Adobe:
+	glyphlist.txt from http://sourceforge.net/projects/aglfn.adobe/files/
+
+GlyphNameMap is indexed by the glyph name string and maps to a unicode character or a list of unicode characters.
+
+For example, GlyphNameMap['A'] -> '\u0041'.
 """
 
 EncodingMap = None

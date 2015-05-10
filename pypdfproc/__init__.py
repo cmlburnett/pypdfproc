@@ -257,6 +257,8 @@ class PDF:
 
 			elif tok.type == 'l':		s.S.do_l(tok.value[0].value, tok.value[1].value)
 			elif tok.type == 'm':		s.S.do_m(tok.value[0].value, tok.value[1].value)
+			elif tok.type == 'Fstar':	pass
+			elif tok.type == 'fstar':	pass
 			elif tok.type == 'F':		pass
 			elif tok.type == 'f':		pass
 			elif tok.type == 'S':		pass
@@ -464,7 +466,46 @@ class FontCache:
 			return g
 
 		elif isinstance(f.Encoding, _pdf.FontEncoding):
-			raise NotImplementedError()
+			# Get objects
+			cmap = f.ToUnicode
+			enc = f.Encoding
+
+			if enc.BaseEncoding:
+				be = enc.BaseEncoding
+			else:
+				# Assume this if can't find anything better in font objects
+				be = 'StandardEncoding'
+
+			# Get base encoding map
+			encmap = _encodingmap.MapCIDToGlyphName(be)
+
+			# Get differences mapping and CMap function
+			if enc.oid not in self.diff_map:
+				self.diff_map[ enc.oid ] = DifferencesArrayToMap(enc.Differences)
+			if not cmap.CMapper:
+				cmap.CMapper = parser.CMapTokenizer().BuildMapper(cmap.Stream)
+
+			# Bounds checking since these error strings are more descriptive than KeyErrors
+			if cid not in self.diff_map[enc.oid] and cid not in encmap:
+				raise ValueError("Unable to find character code %d ('%s') in differences map for encoding oid %s and base encoding '%s'" % (cid, chr(cid), f.Encoding.oid, be))
+
+			# Get glyph name from differences mapping
+			if cid in self.diff_map[enc.oid]:
+				gname = self.diff_map[ enc.oid ][cid]
+			else:
+				gname = encmap[cid]
+
+			u = _encodingmap.MapGlyphNameToUnicode(gname)
+			w = f.Widths[ cid - f.FirstChar ]
+
+			g = Glyph(cid)
+			g.unicode = u
+			g.width = w
+
+			# Cache glyph
+			self.glyph_map[oid][cid] = g
+
+			return g
 		else:
 			raise TypeError("Unrecognized font encoding type: '%s'" % f.Encoding)
 
