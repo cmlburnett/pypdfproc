@@ -33,6 +33,11 @@ def InitEncodingMap():
 	def a(name, std, mac, win, pdf):
 		# If the encoding is provided, then set it
 		# Convert octal to decimal
+		if std != None and int('%d'%std, 8) in EncodingMap['Std']: raise ValueError("Collision in map Std for code %d (octal %d)" % (int('%d'%std,8),std))
+		if mac != None and int('%d'%mac, 8) in EncodingMap['Mac']: raise ValueError("Collision in map Mac for code %d (octal %d)" % (int('%d'%mac,8),mac))
+		if win != None and int('%d'%win, 8) in EncodingMap['Win']: raise ValueError("Collision in map Win for code %d (octal %d)" % (int('%d'%win,8),win))
+		if pdf != None and int('%d'%pdf, 8) in EncodingMap['PDF']: raise ValueError("Collision in map PDF for code %d (octal %d)" % (int('%d'%pdf,8),pdf))
+
 		if std != None: EncodingMap['Std'][ int('%d' % std, 8) ] = name
 		if mac != None: EncodingMap['Mac'][ int('%d' % mac, 8) ] = name
 		if win != None: EncodingMap['Win'][ int('%d' % win, 8) ] = name
@@ -154,8 +159,8 @@ def InitEncodingMap():
 	b('ampersand',		46)
 	a('aring',			None, 214,  345,  345)
 	b('asciicircum',	136)
-	b('sciitilde',		176)
-	b('asterisk',		176)
+	b('asciitilde',		176)
+	b('asterisk',		52)
 	b('at',				100)
 	a('atilde',			None, 213,  343,  343)
 	b('backslash',		134)
@@ -215,7 +220,7 @@ def InitEncodingMap():
 	b('less',			74)
 	a('logicalnot',		None, 302,  254,  254)
 	a('lslash',			370, None, None,  233)
-	a('macron',			350,  370,  257,  257)
+	a('macron',			305,  370,  257,  257)
 	a('minus',			None, None, None, 212)
 	a('mu',				None, 265,  265,  265)
 	a('multiply',		None, None, 327,  327)
@@ -243,7 +248,7 @@ def InitEncodingMap():
 	a('perthousand',	275,  344,  211,  213)
 	b('plus',			53)
 	a('plusminus',		None, 261,  261,  261)
-	b('question',		161)
+	b('question',		77)
 	a('questiondown',	277,  300,  277,  277)
 	b('quotedbl',		42)
 	a('quotedblbase',	271,  343,  204,  214)
