@@ -38,6 +38,8 @@ packages = [
 ]
 data_files = [
 	('pypdfproc', [
+							'pypdfproc/__init__.py',
+							'pypdfproc/encodingmap.py',
 	]),
 	('pypdfproc/parser', [
 							'pypdfproc/parser/__init__.py',

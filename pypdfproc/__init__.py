@@ -11,6 +11,7 @@ import mmap
 
 from . import parser
 from . import pdf as _pdf
+from . import encodingmap as _encodingmap
 
 def isindirect(o):
 	return isinstance(o, _pdf.IndirectObject)
@@ -110,6 +111,10 @@ class PDF:
 
 	def GetGraphicsState(self, page, gsname):
 		"""
+		The text operation Gs uses a external graphics state name that maps to a dictionary via the page's Resources object.
+		This looks up the gsname for the given page.
+		The page can be a Page object or a page number (page is found by DFS'ing the page tree and
+		counting (i.e., it does not look at page labels)).
 		"""
 
 		# Page number provided, find corresponding page
@@ -187,7 +192,7 @@ class PDF:
 			ct = " ".join([ct.Stream for ct in cts])
 		else:
 			ct = cts.Stream
-		print(ct)
+		#print(ct)
 
 		s = parser.StateManager()
 
@@ -293,6 +298,8 @@ class PDF:
 					if subtok.type in ('INT', 'FLOAT'):
 						# Adjust character spacing
 						s.T.do_Tj(subtok.value, None)
+
+						# TODO: If sufficient width to constitute a space, then inject that space
 					else:
 						txt = GetTokenString(subtok)
 
@@ -323,6 +330,39 @@ class PDF:
 				raise ValueError("Cannot render '%s' token yet" % tok.type)
 
 	def GetFullText(self):
+		"""
+		"""
+
+		# Get the root object and the pages in DFS order
+		root = self.GetRootObject()
+		pages = root.Pages.DFSPages()
+
+		# Final text and callback state
+		txt = []
+		state = {'y': -1.0}
+
+		def cb(action, *args):
+			if action != 'glyph draw':
+				return
+
+			x,y = args[0]
+			g = args[1]
+
+			# New row then add newline
+			if state['y'] != y:
+				txt.append('\n')
+				state['y'] = y
+
+			# Add character
+			txt.append(g.unicode)
+
+		# Iterate through pages
+		for page in pages:
+			self.RenderPage(page, cb)
+
+		return "".join(txt)
+
+	def GetFullText2(self):
 		"""
 		Get the full text in the document.
 		This mashes all text into one continuous string and does not subdivide the text by page, bead, column, or anything.
@@ -532,7 +572,7 @@ class FontCache:
 	# Font map: maps (object id, generation) to Font object
 	font_map = None
 
-	# Glyph map: maps (object id, generation) to dictionary of glyphs indexed by CID
+	# Glyph map: maps (object id, generation) of font to dictionary of glyphs indexed by CID
 	glyph_map = None
 
 	# Differences array maps: maps (object id, generation) of FontEncoding object to map dictionary (made by DifferencesArrayToMap)
@@ -545,6 +585,15 @@ class FontCache:
 		self.diff_map = {}
 
 	def GetGlyph(self, oid, cid):
+		"""
+		Dig into font with id @oid and get Glyph object given the character code @cid.
+		"""
+
+		# Get glyph from cache if it's there
+		if oid in self.glyph_map:
+			if cid in self.glyph_map[oid]:
+				return self.glyph_map[oid][cid]
+
 		# Get font from PDF or cache
 		if oid not in self.font_map:
 			f = self.pdf.p.GetObject(oid[0], oid[1])
@@ -553,6 +602,63 @@ class FontCache:
 		else:
 			f = self.font_map[oid]
 
+		# ------------------------------------------------------
+
+		if type(f.Encoding) == str:
+			encmap = _encodingmap.MapCIDToGlyphName(f.Encoding)
+
+			# Character code to glyph name to unicode
+			gname = encmap[cid]
+			u = _encodingmap.MapGlyphNameToUnicode(gname)
+
+			# Get width based on character code
+			w = f.Widths[ cid - f.FirstChar ]
+
+			# Create glyph
+			g = Glyph(cid)
+			g.unicode = u
+			g.width = w
+
+			# Cache glyph
+			self.glyph_map[oid][cid] = g
+
+			return g
+
+		elif isinstance(f.Encoding, _pdf.FontEncoding):
+			raise NotImplementedError()
+		else:
+			raise TypeError("Unrecognized font encoding type: '%s'" % f.Encoding)
+
+		raise NotImplementedError()
+
+	def GetGlyph2(self, oid, cid):
+		# Get font from PDF or cache
+		if oid not in self.font_map:
+			f = self.pdf.p.GetObject(oid[0], oid[1])
+			self.font_map[oid] = f
+			self.glyph_map[oid] = {}
+		else:
+			f = self.font_map[oid]
+
+		cid_cmap = None
+		if f.ToUnicode != None:
+			cmap = f.ToUnicode
+			if not cmap.CMapper:
+				cmap.CMapper = parser.CMapTokenizer().BuildMapper(cmap.Stream)
+
+			try:
+				ret = cmap.Cmapper(cid)
+				if type(ret) == int:
+					raise TypeError("Should return char for '%s' (ord %d) but got integer %d" % (c, ord(c), ret))
+
+				if ret in diffmap:
+					ret = diffmap[ret]
+
+				cid_cmap = ret
+
+			except KeyError:
+				# Not in CMap, so try the differences array
+				pass
 
 		# Get glyph if not cached
 		if cid not in self.glyph_map:
@@ -563,6 +669,10 @@ class FontCache:
 				g = self.GetGlyph_Type1(f, cid)
 			else:
 				raise ValueError("Unknown font type: %s" % f.Subtype)
+
+			# Remap regardless of what font did
+			if cid_cmap != None:
+				g.unicode = cid_cmap
 
 			self.glyph_map[cid] = g
 
