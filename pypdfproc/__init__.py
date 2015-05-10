@@ -570,8 +570,6 @@ class FontCache:
 		else:
 			raise TypeError("Unrecognized font encoding type: '%s'" % f.Encoding)
 
-		raise NotImplementedError()
-
 	def GetGlyph2(self, oid, cid):
 		# Get font from PDF or cache
 		if oid not in self.font_map:
