@@ -151,9 +151,25 @@ class PDF:
 		g = self.fonts.GetGlyph(f.oid, cid)
 		return g
 
+	def RenderPages(self, callback):
+		"""
+		Renders the entire document by steping through each page in a DFS fashion, and invoking a callback function @callback as appropriate.
+		"""
+
+		# Get the root object and the pages in DFS order
+		root = self.GetRootObject()
+		pages = root.Pages.DFSPages()
+
+		callback(None, 'render pages start', None)
+
+		for page in pages:
+			self.RenderPage(page, callback)
+
+		callback(None, 'render pages end', None)
+
 	def RenderPage(self, page, callback):
 		"""
-		Renders the page by processing every content command.
+		Renders a single page @page by processing every content command and invoking a callback function @callback as appropriate.
 		"""
 
 		page = self.GetPage(page)
@@ -169,6 +185,8 @@ class PDF:
 		#print(ct)
 
 		s = parser.StateManager()
+		callback(s, 'page start', page)
+
 
 		toks = tt.TokenizeString(ct)['tokens']
 		for tok in toks:
@@ -324,16 +342,14 @@ class PDF:
 			else:
 				raise ValueError("Cannot render '%s' token yet" % tok.type)
 
+		callback(s, 'page end', page)
+
 	def GetFullText(self):
 		"""
 		Get the full text in the document.
 		This mashes all text into one continuous string with rows of text having newlines separating them.
 		Returns a list of txt streings, with one string per page.
 		"""
-
-		# Get the root object and the pages in DFS order
-		root = self.GetRootObject()
-		pages = root.Pages.DFSPages()
 
 		# Final text and callback state
 		fulltxt = []
@@ -373,18 +389,16 @@ class PDF:
 				if abs(w) > 0.5*state['widths']['avg']:
 					txt.append(' ')
 
+			elif action == 'page end':
+				# Index by page
+				fulltxt.append( "".join(txt) )
+				txt.clear()
 
 			else:
 				# Don't care
 				pass
 
-		# Iterate through pages
-		for page in pages:
-			self.RenderPage(page, cb)
-
-			# Index by page
-			fulltxt.append( "".join(txt) )
-			txt.clear()
+		self.RenderPages(cb)
 
 		return fulltxt
 
