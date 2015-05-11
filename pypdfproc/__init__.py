@@ -198,7 +198,11 @@ class PDF:
 		callback(s, 'page start', page)
 
 
+		# Tokenize the string as a list of tokens
 		toks = tt.TokenizeString(ct)['tokens']
+
+		# Iterate through each token and handle it appropriate by manipulating the state object
+		# and calling the callback function as appropriate
 		for tok in toks:
 			#print(['tok', tok])
 			# Save and restore state
