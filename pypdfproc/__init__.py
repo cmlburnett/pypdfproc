@@ -415,23 +415,10 @@ unicode_mapdat[64432] = "ffl"	# xFB04 is LATIN SMALL LIGATURE FFL is sometimes u
 unicode_mapdat[64434] = "st"	# xFB06 is LATIN SMALL LIGATURE ST is sometimes used instead of "st" for some reason
 
 def GetTokenString(tok, bytesize=None):
-	if tok.type == 'LIT':
-		l = tok.value
-		#print(['l', l])
-
-		ret = SplitLiteral(l)
-
-	elif tok.type == 'HEXSTRING':
-		h = tok.value
-		#print(['h', h])
-
-		ret = SplitHex(h, bytesize)
+	if tok.type == 'LIT':				return SplitLiteral(tok.value)
+	elif tok.type == 'HEXSTRING':		return SplitHex(tok.value, bytesize)
 	else:
 		raise TypeError("Unrecognized Tj token type: %s" % tok.type)
-
-	#print(ret)
-	#print([ord(c) for c in ret])
-	return ret
 
 def SplitLiteral(lit):
 	"""
