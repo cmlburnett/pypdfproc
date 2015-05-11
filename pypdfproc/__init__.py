@@ -48,6 +48,11 @@ class PDF:
 		self.fonts = FontCache(self)
 
 	def Close(self):
+		"""
+		Closes the file and all associated things.
+		This object becomes useless after closing.
+		"""
+
 		self.m.close()
 		self.f.close()
 
