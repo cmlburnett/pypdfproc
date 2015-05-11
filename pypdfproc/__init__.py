@@ -60,6 +60,9 @@ class PDF:
 		self.f = None
 		self.p = None
 
+	# --------------------------------------------------------------------------------
+	# Helper functions
+
 	def GetPage(self, page):
 		"""
 		Page number provided, find corresponding page
@@ -358,6 +361,9 @@ class PDF:
 
 		callback(s, 'page end', page)
 
+	# --------------------------------------------------------------------------------
+	# Utility functions that provide a some sort of utility function
+
 	def GetFullText(self):
 		"""
 		Get the full text in the document.
@@ -370,6 +376,7 @@ class PDF:
 		txt = []
 		state = {'y': -1.0, 'widths': None}
 
+		# Callback function that si appropriate to handle generation of a fulltext transcript of the document
 		def cb(s, action, page, *args):
 			if action == 'change font':
 				Tf = args[0]
@@ -412,8 +419,10 @@ class PDF:
 				# Don't care
 				pass
 
+		# Render all the pages and use the above callback function
 		self.RenderPages(cb)
 
+		# Return a list of strings where each string represents one page of text
 		return fulltxt
 
 	def GetPageThumbnail(self, page):
