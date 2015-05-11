@@ -3,6 +3,7 @@ Font cache used to speed up repetative glyph lookups.
 """
 
 from . import encodingmap as _encodingmap
+from . import pdf as _pdf
 from .glyph import Glyph
 
 class FontCache:
