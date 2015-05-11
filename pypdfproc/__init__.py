@@ -417,6 +417,7 @@ unicode_mapdat[64434] = "st"	# xFB06 is LATIN SMALL LIGATURE ST is sometimes use
 def GetTokenString(tok, bytesize=None):
 	"""
 	Based on the token type, get the data as an array of characters to operate on.
+	Hex strings require a size be specified as to how many bytes are blocked together to form a single character (supply this via @bytesize).
 	"""
 
 	if tok.type == 'LIT':				return SplitLiteral(tok.value)
@@ -491,9 +492,11 @@ def SplitHex(txt, bytesize):
 		raise ValueError("Byte size not provided, cannot split hex string without it")
 
 	# Trailing zero can be dropped per PDF standard, so put it back
+	# NB: mod 2 is correct since only one trailing zero may be trimmed
 	if len(txt)%2 == 1:
 		txt += '0'
 
+	# NB: bytesize*2 since two base-16 characters form a byte
 	if len(txt)%(bytesize*2) != 0:
 		raise ValueError("Cannot split hex string (len=%d) into %d bytes without assuming padding" % (len(txt), bytesize*2))
 
