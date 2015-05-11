@@ -54,6 +54,27 @@ class PDF:
 		self.f = None
 		self.p = None
 
+	def GetPage(self, page):
+		"""
+		Page number provided, find corresponding page
+		"""
+
+		if type(page) == int:
+			root = self.GetRootObject()
+			pages = root.Pages.DFSPages()
+
+			if page < 1:				raise ValueError("Page number (%d) must be a positive number" % page)
+			if page > len(pages):		raise ValueError("Page number (%d) is larger the total number of pages" % page)
+
+			# Get page (pages is zero-based and pagenum is one-based, so subtract one)
+			return pages[page-1]
+
+		elif isinstance(page, _pdf.Page):
+			return page
+
+		else:
+			raise TypeError("Unrecognized page type passed: %s" % page)
+
 	def GetRootObject(self):
 		"""
 		Gets the root object (aka catalog) of the file.
@@ -74,23 +95,7 @@ class PDF:
 		counting (i.e., it does not look at page labels)).
 		"""
 
-		# Page number provided, find corresponding page
-		if type(page) == int:
-			root = self.GetRootObject()
-			pages = root.Pages.DFSPages()
-
-			if page < 1:				raise ValueError("Page number (%d) must be a positive number" % page)
-			if page > len(pages):		raise ValueError("Page number (%d) is larger the total number of pages" % page)
-
-			# Get page (pages is zero-based and pagenum is one-based, so subtract one)
-			page = pages[page-1]
-
-		elif isinstance(page, _pdf.Page):
-			# Page supplied, nothing to get
-			pass
-
-		else:
-			raise TypeError("Unrecognized page type passed: %s" % page)
+		page = self.GetPage(page)
 
 		# Get resources for the page
 		recs = page.Resources
@@ -117,23 +122,7 @@ class PDF:
 		counting (i.e., it does not look at page labels)).
 		"""
 
-		# Page number provided, find corresponding page
-		if type(page) == int:
-			root = self.GetRootObject()
-			pages = root.Pages.DFSPages()
-
-			if page < 1:				raise ValueError("Page number (%d) must be a positive number" % page)
-			if page > len(pages):		raise ValueError("Page number (%d) is larger the total number of pages" % page)
-
-			# Get page (pages is zero-based and pagenum is one-based, so subtract one)
-			page = pages[page-1]
-
-		elif isinstance(page, _pdf.Page):
-			# Page supplied, nothing to get
-			pass
-
-		else:
-			raise TypeError("Unrecognized page type passed: %s" % page)
+		page = self.GetPage(page)
 
 		# Get resources for the page
 		recs = page.Resources
@@ -166,23 +155,7 @@ class PDF:
 		Renders the page by processing every content command.
 		"""
 
-		# Page number provided, find corresponding page
-		if type(page) == int:
-			root = self.GetRootObject()
-			pages = root.Pages.DFSPages()
-
-			if page < 1:				raise ValueError("Page number (%d) must be a positive number" % page)
-			if page > len(pages):		raise ValueError("Page number (%d) is larger the total number of pages" % page)
-
-			# Get page (pages is zero-based and pagenum is one-based, so subtract one)
-			page = pages[page-1]
-
-		elif isinstance(page, _pdf.Page):
-			# Page supplied, nothing to get
-			pass
-
-		else:
-			raise TypeError("Unrecognized page type passed: %s" % page)
+		page = self.GetPage(page)
 
 		# The text tokenizer
 		tt = parser.TextTokenizer(self.f, self.p)
@@ -423,22 +396,7 @@ class PDF:
 		counting (i.e., it does not look at page labels)).
 		"""
 
-		if type(page) == int:
-			root = self.GetRootObject()
-			pages = root.Pages.DFSPages()
-
-			if page < 1:				raise ValueError("Page number (%d) must be a positive number" % page)
-			if page > len(pages):		raise ValueError("Page number (%d) is larger the total number of pages" % page)
-
-			# Get page (pages is zero-based and pagenum is one-based, so subtract one)
-			page = pages[page-1]
-
-		elif isinstance(page, _pdf.Page):
-			# Page supplied, nothing to get
-			pass
-
-		else:
-			raise TypeError("Unrecognized page type passed: %s" % page)
+		page = self.GetPage(page)
 
 		t = page.Thumb
 		raise NotImplementedError()
