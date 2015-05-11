@@ -501,9 +501,5 @@ def SplitHex(txt, bytesize):
 		raise ValueError("Cannot split hex string (len=%d) into %d bytes without assuming padding" % (len(txt), bytesize*2))
 
 	# If bytesize == 1 then need 2 characters, bytesize == 2 then need 4 characters
-	ret = []
-	for i in range(0, len(txt), bytesize*2):
-		ret.append( chr(int(txt[i:i+(bytesize*2)],16)) )
-
-	return ret
+	return [chr(int(txt[i:i+(bytesize*2)],16)) for i in range(0, len(txt), bytesize*2)]
 
