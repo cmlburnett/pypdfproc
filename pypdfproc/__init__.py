@@ -415,6 +415,10 @@ unicode_mapdat[64432] = "ffl"	# xFB04 is LATIN SMALL LIGATURE FFL is sometimes u
 unicode_mapdat[64434] = "st"	# xFB06 is LATIN SMALL LIGATURE ST is sometimes used instead of "st" for some reason
 
 def GetTokenString(tok, bytesize=None):
+	"""
+	Based on the token type, get the data as an array of characters to operate on.
+	"""
+
 	if tok.type == 'LIT':				return SplitLiteral(tok.value)
 	elif tok.type == 'HEXSTRING':		return SplitHex(tok.value, bytesize)
 	else:
