@@ -5,65 +5,6 @@ Font cache used to speed up repetative glyph lookups.
 from . import encodingmap as _encodingmap
 from .glyph import Glyph
 
-def CIDWidthArrayToMap(arr):
-	"""
-	CID width array comes as an array with two patterns of information.
-	The first is an integer followed by an array: the integer is the starting character ID and the array is a set of widths.
-	The second is three integers: the first two specify a range and the third is the width for the entire range.
-	"""
-	mapdat = {}
-
-	i = 0
-	imax = len(arr)
-	while i < imax:
-		if type(arr[i]) == int and isinstance(arr[i+1], _pdf.Array):
-			# Base code is given first
-			basecode = arr[i]
-
-			# Then incrementally applied to each element in the array
-			for v in arr[i+1]:
-				mapdat[basecode] = v
-				basecode += 1
-
-			# Two: one for int, one for array
-			i += 2
-
-		elif type(arr[i]) == int and type(arr[i+1]) == int and type(arr[i+2]) == int:
-			# First and second number define a range, and each within the range
-			# is the same width that is the third number
-			for k in range(arr[i], arr[i+1]+1):
-				mapdat[k] = arr[i+2]
-
-			# Three: one for start index, one for end index, one for width
-			i += 3
-		else:
-			raise TypeError("Unrecognized type (%s) when iterating through CID widths array: %s" % (arr[i], arr))
-
-	return mapdat
-
-def DifferencesArrayToMap(arr):
-	"""
-	Format of the Differences array is an integer followed by literals.
-	The integer refers to the character code/ID (CID) of the first literal and each
-	subsequent literal auto-increments the associated CID.
-	For example [10, 'a', 'b'] would make 10 to 'a' and 11 to 'b'.
-	Numerous integer/literals can be in the array and each segment may not overlap with another.
-	"""
-
-	mapdat = {}
-
-	lastcode = 0
-	for item in arr:
-		# If an integer then set the last code used
-		if type(item) == int:
-			lastcode = item
-		else:
-			# Assign literal to code and increment code
-			mapdat[ lastcode ] = item
-			lastcode += 1
-
-	return mapdat
-
 
 class Type0FontCache:
 	"""
@@ -310,4 +251,63 @@ class FontCache:
 		print(['gname', gname])
 
 		raise NotImplementedError()
+
+def CIDWidthArrayToMap(arr):
+	"""
+	CID width array comes as an array with two patterns of information.
+	The first is an integer followed by an array: the integer is the starting character ID and the array is a set of widths.
+	The second is three integers: the first two specify a range and the third is the width for the entire range.
+	"""
+	mapdat = {}
+
+	i = 0
+	imax = len(arr)
+	while i < imax:
+		if type(arr[i]) == int and isinstance(arr[i+1], _pdf.Array):
+			# Base code is given first
+			basecode = arr[i]
+
+			# Then incrementally applied to each element in the array
+			for v in arr[i+1]:
+				mapdat[basecode] = v
+				basecode += 1
+
+			# Two: one for int, one for array
+			i += 2
+
+		elif type(arr[i]) == int and type(arr[i+1]) == int and type(arr[i+2]) == int:
+			# First and second number define a range, and each within the range
+			# is the same width that is the third number
+			for k in range(arr[i], arr[i+1]+1):
+				mapdat[k] = arr[i+2]
+
+			# Three: one for start index, one for end index, one for width
+			i += 3
+		else:
+			raise TypeError("Unrecognized type (%s) when iterating through CID widths array: %s" % (arr[i], arr))
+
+	return mapdat
+
+def DifferencesArrayToMap(arr):
+	"""
+	Format of the Differences array is an integer followed by literals.
+	The integer refers to the character code/ID (CID) of the first literal and each
+	subsequent literal auto-increments the associated CID.
+	For example [10, 'a', 'b'] would make 10 to 'a' and 11 to 'b'.
+	Numerous integer/literals can be in the array and each segment may not overlap with another.
+	"""
+
+	mapdat = {}
+
+	lastcode = 0
+	for item in arr:
+		# If an integer then set the last code used
+		if type(item) == int:
+			lastcode = item
+		else:
+			# Assign literal to code and increment code
+			mapdat[ lastcode ] = item
+			lastcode += 1
+
+	return mapdat
 
