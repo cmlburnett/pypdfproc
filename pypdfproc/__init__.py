@@ -149,12 +149,17 @@ class PDF:
 
 
 	def GetGlyph(self, page, fontname, cid):
+		"""
+		Simple function that maps a character ID (@cid) of a font name (@fontname) on a given page (@page) to a Glyph object.
+		Utilizes a cache object to speed lookups, but no caching is done locally.
+		"""
+
 		# Get font just to get object ID
 		f = self.GetFont(page, fontname)
 
 		# Glyph is irrespective of page, just font and character ID
-		g = self.fonts.GetGlyph(f.oid, cid)
-		return g
+		# NB: this object does all CID->glyph caching
+		return self.fonts.GetGlyph(f.oid, cid)
 
 	def RenderPages(self, callback):
 		"""
