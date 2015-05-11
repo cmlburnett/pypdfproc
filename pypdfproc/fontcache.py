@@ -2,6 +2,8 @@
 Font cache used to speed up repetative glyph lookups.
 """
 
+# Local files
+from . import parser
 from . import encodingmap as _encodingmap
 from . import pdf as _pdf
 from .glyph import Glyph
