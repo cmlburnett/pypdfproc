@@ -1,6 +1,9 @@
 """
 PDF Processor
 """
+"""
+PDF processor
+"""
 
 __version__ = "1.0.0"
 
@@ -9,9 +12,10 @@ __all__ = ['parser']
 # System libs
 import mmap
 
+# Local files
 from . import parser
 from . import pdf as _pdf
-from . import encodingmap as _encodingmap
+from .fontcache import FontCache
 
 def isindirect(o):
 	return isinstance(o, _pdf.IndirectObject)
@@ -401,222 +405,6 @@ class PDF:
 		t = page.Thumb
 		raise NotImplementedError()
 
-class Type0FontCache:
-	"""
-	Handle Type0 fonts.
-	More complex than simple fonts so having a dedicated structure seems reasonable.
-	"""
-
-	# Font this cachine
-	font = None
-
-	# Maps CDI to width
-	widthmap = None
-
-	def __init__(self, f):
-		self.font = f
-		self.widthmap = {}
-
-		# Index widths by CID
-		for subf in f.DescendantFonts:
-			m = CIDWidthArrayToMap(subf.W)
-			for k,v in m.items():
-				self.widthmap[k] = (v, subf)
-
-	def GetGlyph(self, cid):
-		cmap = self.font.ToUnicode
-		if not cmap.CMapper:
-			cmap.CMapper = parser.CMapTokenizer().BuildMapper(cmap.Stream)
-
-		# Map CID
-		u = cmap.CMapper(cid)
-
-		g = Glyph(cid)
-		g.width = self.widthmap[cid][0]
-		g.unicode = u
-
-		return g
-
-class FontCache:
-	pdf = None
-
-	# Font map: maps (object id, generation) to Font object
-	font_map = None
-
-	# Glyph map: maps (object id, generation) of font to dictionary of glyphs indexed by CID
-	glyph_map = None
-
-	# Differences array maps: maps (object id, generation) of FontEncoding object to map dictionary (made by DifferencesArrayToMap)
-	diff_map = None
-
-	def __init__(self, pdf):
-		self.pdf = pdf
-		self.font_map = {}
-		self.glyph_map = {}
-		self.diff_map = {}
-		self.type0_map = {}
-
-	def GetGlyph(self, oid, cid):
-		"""
-		Dig into font with id @oid and get Glyph object given the character code @cid.
-		"""
-
-		# Get glyph from cache if it's there
-		if oid in self.glyph_map:
-			if cid in self.glyph_map[oid]:
-				return self.glyph_map[oid][cid]
-
-		# Get font from PDF or cache
-		if oid not in self.font_map:
-			f = self.pdf.p.GetObject(oid[0], oid[1])
-			self.font_map[oid] = f
-			self.glyph_map[oid] = {}
-		else:
-			f = self.font_map[oid]
-
-		# ------------------------------------------------------
-
-		if f.Subtype == 'Type0':
-			# Cache instance if not present
-			if oid not in self.type0_map:
-				self.type0_map[oid] = Type0FontCache(f)
-
-			# Get glyph
-			g = self.type0_map[oid].GetGlyph(cid)
-
-			# Cache glyph
-			self.glyph_map[oid][cid] = g
-
-			return g
-
-		elif type(f.Encoding) == str:
-			encmap = _encodingmap.MapCIDToGlyphName(f.Encoding)
-
-			# Bounds checking since these error strings are more descriptive than KeyErrors
-			if cid not in encmap:
-				raise ValueError("Unable to find character code %d ('%s') in encoding map for encoding %s" % (cid, chr(cid), f.Encoding))
-			if cid - f.FirstChar > len(f.Widths):
-				raise KeyError("Character code (%d) from the first character (%d) exceeds the widths array (len=%d)" % (cid, f.FirstChar, len(f.Widths)))
-
-
-			# Character code to glyph name to unicode
-			gname = encmap[cid]
-			u = _encodingmap.MapGlyphNameToUnicode(gname)
-			if u == None:
-				raise NotImplementedError()
-
-			# Get width based on character code
-			w = f.Widths[ cid - f.FirstChar ]
-
-			# Create glyph
-			g = Glyph(cid)
-			g.unicode = u
-			g.width = w
-
-			# Cache glyph
-			self.glyph_map[oid][cid] = g
-
-			return g
-
-		elif isinstance(f.Encoding, _pdf.FontEncoding):
-			# Get objects
-			cmap = f.ToUnicode
-			enc = f.Encoding
-
-			if enc.BaseEncoding:
-				be = enc.BaseEncoding
-			else:
-				# Assume this if can't find anything better in font objects
-				be = 'StandardEncoding'
-
-			# Get base encoding map
-			encmap = _encodingmap.MapCIDToGlyphName(be)
-
-			# Get differences mapping and CMap function
-			if enc.oid not in self.diff_map:
-				self.diff_map[ enc.oid ] = DifferencesArrayToMap(enc.Differences)
-			if cmap and not cmap.CMapper:
-				cmap.CMapper = parser.CMapTokenizer().BuildMapper(cmap.Stream)
-
-			# Bounds checking since these error strings are more descriptive than KeyErrors
-			if cid not in self.diff_map[enc.oid] and cid not in encmap:
-				raise ValueError("Unable to find character code %d ('%s') in differences map for encoding oid %s and base encoding '%s'" % (cid, chr(cid), f.Encoding.oid, be))
-
-			# Get glyph name from differences mapping first, but otherwise fallback on the standard encoding map
-			if cid in self.diff_map[enc.oid]:
-				gname = self.diff_map[ enc.oid ][cid]
-			else:
-				gname = encmap[cid]
-
-			u = _encodingmap.MapGlyphNameToUnicode(gname)
-			if u == None:
-				u = self.MissingGlyphName(f, encmap, cid, gname)
-
-			w = f.Widths[ cid - f.FirstChar ]
-
-			# TODO: catch fi, fl, etc. ligatures here???
-
-			g = Glyph(cid)
-			g.unicode = u
-			g.width = w
-
-			# Cache glyph
-			self.glyph_map[oid][cid] = g
-
-			return g
-		else:
-			raise TypeError("Unrecognized font encoding type: '%s'" % f.Encoding)
-
-	def MissingGlyphName(self, f, encmap, cid, gname):
-		# Try the cmap
-		if f.ToUnicode:
-			try:
-				return f.ToUnicode.CMapper(cid)
-			except KeyError:
-				# Not there, try again
-				pass
-
-		if f.BaseFont != None:
-			if f.BaseFont.endswith('AdvP4C4E74'):
-				if gname == 'C0':		return '\u2212' # Minus sign
-				elif gname == 'C6':		return '\u00B1' # Plus-mins sign
-				elif gname == 'C14':	return '\u00B0' # Degree symbol
-				elif gname == 'C15':	return '\u2022' # Bullet
-				elif gname == 'C211':	return '\u00A9' # Copyright
-			if f.BaseFont.endswith('AdvPSSym'):
-				if gname == 'C211':		return '\u00A9' # Copyright
-
-		print(['f', f.getsetprops()])
-		print(['enc', f.Encoding.getsetprops()])
-		print(['cmap', f.ToUnicode])
-		print(['encmap', encmap])
-		print(['gname', gname])
-
-		raise NotImplementedError()
-
-class Glyph:
-	def __init__(self, cid):
-		self.cid = cid
-		self.unicode = None
-		self.width = 0
-
-	def __repr__(self):
-		return str(self)
-	def __str__(self):
-		return "<Glyph cid=%d unicode='%s' width=%d>" % (self.cid, self.unicode, self.width or 0)
-
-	def get_cid(self):				return self._cid
-	def set_cid(self,v):			self._cid = v
-	cid = property(get_cid, set_cid, doc="Character ID")
-
-	def get_unicode(self):			return self._uni
-	def set_unicode(self,v):		self._uni = v
-	uni = property(get_unicode, set_unicode, doc="Glyph unicode")
-
-	def get_width(self):			return self._width
-	def set_width(self,v):			self._width = float(v)
-	width = property(get_width, set_width, doc="Glyph width")
-
 
 # FIXME: not the way to do this I don't think
 unicode_mapdat = {}
@@ -727,37 +515,6 @@ def SplitHex(txt, bytesize):
 		ret.append( chr(int(txt[i:i+(bytesize*2)],16)) )
 
 	return ret
-
-def CIDWidthArrayToMap(arr):
-	mapdat = {}
-
-	i = 0
-	imax = len(arr)
-	while i < imax:
-		if type(arr[i]) == int and isinstance(arr[i+1], _pdf.Array):
-			# Base code is given first
-			basecode = arr[i]
-
-			# Then incrementally applied to each element in the array
-			for v in arr[i+1]:
-				mapdat[basecode] = v
-				basecode += 1
-
-			# Two: one for int, one for array
-			i += 2
-
-		elif type(arr[i]) == int and type(arr[i+1]) == int and type(arr[i+2]) == int:
-			# First and second number define a range, and each within the range
-			# is the same width that is the third number
-			for k in range(arr[i], arr[i+1]+1):
-				mapdat[k] = arr[i+2]
-
-			# Three: one for start index, one for end index, one for width
-			i += 3
-		else:
-			raise TypeError("Unrecognized type (%s) when iterating through CID widths array: %s" % (arr[i], arr))
-
-	return mapdat
 
 def DifferencesArrayToMap(arr):
 	"""
