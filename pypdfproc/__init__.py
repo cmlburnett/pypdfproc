@@ -500,26 +500,3 @@ def SplitHex(txt, bytesize):
 
 	return ret
 
-def DifferencesArrayToMap(arr):
-	"""
-	Format of the Differences array is an integer followed by literals.
-	The integer refers to the character code/ID (CID) of the first literal and each
-	subsequent literal auto-increments the associated CID.
-	For example [10, 'a', 'b'] would make 10 to 'a' and 11 to 'b'.
-	Numerous integer/literals can be in the array and each segment may not overlap with another.
-	"""
-
-	mapdat = {}
-
-	lastcode = 0
-	for item in arr:
-		# If an integer then set the last code used
-		if type(item) == int:
-			lastcode = item
-		else:
-			# Assign literal to code and increment code
-			mapdat[ lastcode ] = item
-			lastcode += 1
-
-	return mapdat
-
