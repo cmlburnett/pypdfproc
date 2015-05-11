@@ -5,55 +5,6 @@ Font cache used to speed up repetative glyph lookups.
 from . import encodingmap as _encodingmap
 from .glyph import Glyph
 
-
-class Type0FontCache:
-	"""
-	Handle Type0 fonts.
-	More complex than simple fonts so having a dedicated structure seems reasonable.
-	"""
-
-	# Font this cachine
-	font = None
-
-	# Maps CDI to width
-	widthmap = None
-
-	def __init__(self, f):
-		"""
-		Type0 font cache for the font @f.
-		"""
-
-		self.font = f
-		self.widthmap = {}
-
-		# Index widths by CID
-		for subf in f.DescendantFonts:
-			m = CIDWidthArrayToMap(subf.W)
-			for k,v in m.items():
-				self.widthmap[k] = (v, subf)
-
-	def GetGlyph(self, cid):
-		"""
-		Get glyph information based on the character ID @cid.
-		"""
-
-		# Get CMap and build mapper if not already cached
-		cmap = self.font.ToUnicode
-		if not cmap.CMapper:
-			cmap.CMapper = parser.CMapTokenizer().BuildMapper(cmap.Stream)
-
-		# Map CID
-		u = cmap.CMapper(cid)
-
-		# Create glyph information
-		g = Glyph(cid)
-		g.width = self.widthmap[cid][0]
-		g.unicode = u
-
-		# NB: glyph caching is done in FontCache, not here
-
-		return g
-
 class FontCache:
 	"""
 	Font cache for various font information to speed-up glyph lookups.
@@ -251,6 +202,54 @@ class FontCache:
 		print(['gname', gname])
 
 		raise NotImplementedError()
+
+class Type0FontCache:
+	"""
+	Handle Type0 fonts.
+	More complex than simple fonts so having a dedicated structure seems reasonable.
+	"""
+
+	# Font this cachine
+	font = None
+
+	# Maps CDI to width
+	widthmap = None
+
+	def __init__(self, f):
+		"""
+		Type0 font cache for the font @f.
+		"""
+
+		self.font = f
+		self.widthmap = {}
+
+		# Index widths by CID
+		for subf in f.DescendantFonts:
+			m = CIDWidthArrayToMap(subf.W)
+			for k,v in m.items():
+				self.widthmap[k] = (v, subf)
+
+	def GetGlyph(self, cid):
+		"""
+		Get glyph information based on the character ID @cid.
+		"""
+
+		# Get CMap and build mapper if not already cached
+		cmap = self.font.ToUnicode
+		if not cmap.CMapper:
+			cmap.CMapper = parser.CMapTokenizer().BuildMapper(cmap.Stream)
+
+		# Map CID
+		u = cmap.CMapper(cid)
+
+		# Create glyph information
+		g = Glyph(cid)
+		g.width = self.widthmap[cid][0]
+		g.unicode = u
+
+		# NB: glyph caching is done in FontCache, not here
+
+		return g
 
 def CIDWidthArrayToMap(arr):
 	"""
