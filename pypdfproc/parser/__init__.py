@@ -3,6 +3,7 @@ import os
 from . import pdf as pdfloc
 from . import text as textloc
 from . import cmap as cmaploc
+from . import cff as cffloc
 from .state import StateManager, State, Mat3x3, Pos
 
 from .. import pdf as _pdf
@@ -385,6 +386,9 @@ class PDFTokenizer:
 
 		return self.GetObject(ind.objid, ind.generation, self._ParseCatalog)
 
+	def GetArray(self, ind):
+		return self.GetObject(ind.objid, ind.generation, self._ParseArray)
+
 	def GetDictionary(self, ind):
 		return self.GetObject(ind.objid, ind.generation, self._ParseDictionary)
 
@@ -716,6 +720,8 @@ class PDFTokenizer:
 			if isinstance(value, _pdf.IndirectObject):
 				if key == 'FontDescriptor':
 					return self.GetFontDescriptor(value)
+				elif key == 'W':
+					return self.GetArray(value)
 			else:
 				return value
 
@@ -745,7 +751,6 @@ class PDFTokenizer:
 
 		print(value)
 		raise NotImplementedError("Dynamic loader for class '%s' and key '%s' not implemented" % (klass.__name__, key))
-
 
 class TextTokenizer:
 	"""
@@ -837,7 +842,6 @@ class TextTokenizer:
 
 		return " ".join(ret)
 
-
 class CMapTokenizer:
 	"""
 	Tokenizer for CMap programs.
@@ -914,6 +918,15 @@ class CMapTokenizer:
 				raise KeyError("Cannot map character '%s' (ord %d): not found in map" % (c, cc))
 
 		return mapper
+
+class CFFTokenizer:
+
+	def __init__(self):
+		pass
+
+	def TokenizeString(self, txt):
+		return cffloc.TokenizeString(txt)
+
 
 class TokenHelpers:
 	@staticmethod

@@ -239,6 +239,20 @@ class Type0FontCache:
 
 		# Get CMap and build mapper if not already cached
 		cmap = self.font.ToUnicode
+		if cmap == None:
+			print(['f', self.font.getsetprops()])
+
+			for subf in self.font.DescendantFonts:
+				print(['subf', subf.getsetprops()])
+				print(['subf desc', subf.FontDescriptor.getsetprops()])
+
+				ff3 = subf.FontDescriptor.FontFile3
+
+				print(['fontfile3', ff3])
+				t = parser.CFFTokenizer()
+				t.TokenizeString(ff3.Stream)
+
+
 		if not cmap.CMapper:
 			cmap.CMapper = parser.CMapTokenizer().BuildMapper(cmap.Stream)
 
