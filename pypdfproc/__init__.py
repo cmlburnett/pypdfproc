@@ -12,7 +12,7 @@ import mmap
 # Local files
 from . import parser
 from . import pdf as _pdf
-from .fontcache import FontCache
+from .fontcache import FontCache, CIDWidthArrayToMap
 
 def isindirect(o):
 	return isinstance(o, _pdf.IndirectObject)
@@ -122,6 +122,27 @@ class PDF:
 
 		# Return Font1, Font3, or FontTrue object
 		return f
+
+	def GetFontWidths(self, f):
+		if f.Subtype in ('TrueType', 'Type1'):
+			return f.Widths
+
+		elif f.Subtype == 'Type0':
+			widths = {}
+
+			for subf in f.DescendantFonts:
+				m = CIDWidthArrayToMap(subf.W)
+				for k,v in m.items():
+					widths[k] = v
+
+			keys = list(widths.keys())
+			keys.sort()
+
+			# Return in order, but may have gaps in CID coverage
+			return [widths[k] for k in keys]
+
+		else:
+			raise NotImplementedError("Unrecognized font type '%s'" % f.Subtype)
 
 	def GetGraphicsState(self, page, gsname):
 		"""
@@ -384,7 +405,8 @@ class PDF:
 
 				f = self.GetFont(page, Tf)
 
-				w = f.Widths
+				w = self.GetFontWidths(f)
+
 				w = [v for v in w if v != 0]
 				state['widths'] = {'avg': sum(w)/float(len(w)), 'min': min(w), 'max': max(w)}
 
