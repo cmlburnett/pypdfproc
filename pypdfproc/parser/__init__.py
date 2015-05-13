@@ -774,74 +774,6 @@ class TextTokenizer:
 	def TokenizeString(self, txt):
 		return textloc.TokenizeString(txt)
 
-	def TokensToText(self, tokens, page):
-		ret = []
-
-		state = {}
-		state['font'] = {}
-
-		#print('=================')
-		for i in range(len(tokens)):
-			tok = tokens[i]
-			print(tok)
-
-			if tok.type == 'Tf':
-				f = state['font']['font'] = tok.value[0].value
-				s = state['font']['size'] = tok.value[1].value
-				fo = state['font']['obj'] = page.ResourcesOBJS['Font'][f]
-				fd = fo.FontDescriptorOBJ
-
-				# Pull out object stuff
-				fbase = fo.BaseFont
-				fchar = fo.FirstChar
-				lchar = fo.LastChar
-				widths = fo.Widths
-				enc = fo.Encoding
-				touni = fo.ToUnicode
-				charset = fd.CharSetARR
-				fname = fd.FontName
-				ffile = fd.FontFile3
-
-				if fo.EncodingOBJ:
-					enc = fo.EncodingOBJ
-				if fo.ToUnicode:
-					touni = fo.ToUnicodeOBJ
-
-				print()
-				print(['Tf font', f, s, fchar, lchar, enc, touni, charset, fbase, fname, ffile])
-
-				if touni:
-					cmaploc.cmaptxt = fo.ToUnicodeOBJ.InterpretStream()
-
-					cmapint = cmaploc.pdfcmap()
-					cmaptokens = cmapint.TokenizeString(cmaptxt)
-					for cmpi in range(len(cmaptokens)):
-						cmptok = cmaptokens[cmpi]
-						print(cmptok)
-
-			elif tok.type == 'Tj':
-				ret.append(tok.value[0].value)
-			elif tok.type == 'TJ':
-				subret = ""
-				for v in tok.value:
-					if v.type == "LIT":
-						subret += v.value
-					elif v.type == "INT":
-						# If longer than a threshold, assume it's a space
-						# TODO: use FontDescription some how
-						if abs(v.value) > 150:
-							subret += " "
-						else:
-							pass
-
-				ret.append(subret)
-
-
-		print(ret)
-		print("\n".join(ret))
-
-		return " ".join(ret)
-
 class CMapTokenizer:
 	"""
 	Tokenizer for CMap programs.
@@ -920,7 +852,6 @@ class CMapTokenizer:
 		return mapper
 
 class CFFTokenizer:
-
 	def __init__(self):
 		pass
 
