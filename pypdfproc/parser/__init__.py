@@ -852,12 +852,21 @@ class CMapTokenizer:
 		return mapper
 
 class CFFTokenizer:
-	def __init__(self):
-		pass
+	def __init__(self, txt):
+		self.txt = txt
 
-	def TokenizeString(self, txt):
-		return cffloc.TokenizeString(txt)
+	def Parse(self):
+		self.tzdat = cffloc.TokenizeString(self.txt)
 
+	def DumpBinary(self):
+		self.tzdat['unpacker'].DumpBinary()
+
+	# --------------------------------------------------------------------------------
+	# Derivatives of parsing
+
+	def get_version(self):
+		return (self.tzdat['Header']['major'], self.tzdat['Header']['minor'])
+	version = property(get_version)
 
 class TokenHelpers:
 	@staticmethod

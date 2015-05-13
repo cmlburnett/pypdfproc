@@ -438,6 +438,19 @@ class _CFFUnpacker:
 		self.buf = bytes(txt, 'latin-1')
 		self.offset = 0
 
+	def DumpBinary(self):
+		l = len(self.buf)
+
+		for i in range(0, int(l/8), 8):
+			print("%4x | %02x %02x %02x %02x   %02x %02x %02x %02x" % (i, self.buf[i], self.buf[i+1], self.buf[i+2], self.buf[i+3], self.buf[i+4], self.buf[i+5], self.buf[i+6], self.buf[i+7]))
+		if l%8:
+			out = "%4x |" % int(l/8)
+			for i in range(l%8):
+				if i == 4:
+					out += "  "
+				out += " %02x" % self.buf[l+i]
+			print(out)
+
 	def _unpack(self, fmt):
 		# Always big-endian
 		fmt = ">" + fmt
@@ -722,43 +735,32 @@ class _CFFUnpacker:
 def TokenizeString(txt):
 	u = _CFFUnpacker(txt)
 
-	for i in range(0, len(u.buf), 8):
-		print("%4x | %02x %02x %02x %02x   %02x %02x %02x %02x" % (i, u.buf[i], u.buf[i+1], u.buf[i+2], u.buf[i+3], u.buf[i+4], u.buf[i+5], u.buf[i+6], u.buf[i+7]))
-		if i > 1000: break
-
 	off = u.offset
 	header = u.GetHeader()
-
-	print(['header', "%X"%off, header])
+	header['_offset'] = off
 
 	off = u.offset
 	name_index = u.GetIndex()
-
-	print(['Name INDEX', "%X"%off, name_index])
+	name_index['_offset'] = off
 
 	off = u.offset
-	name_dict_index = u.GetIndex()
-
-	print(['Top DICT INDEX', "%X"%off, name_dict_index])
+	top_dict_index = u.GetIndex()
+	top_dict_index['_offset'] = off
 
 	fonts = []
-	for font in name_dict_index['data']:
+	for font in top_dict_index['data']:
 		f = u.ParseTopDict(font)
 		fonts.append(f)
-		print(['font', font, f])
+	top_dict_index['fonts'] = fonts
 
 	off = u.offset
 	string_index = u.GetIndex()
-
-	print(['String INDEX', "%X"%off, string_index])
-
-	sidx = fonts[0].index('BaseFontName') - 1
-	print(['BaseFontName', _CFFUnpacker.GetString(string_index['data'], fonts[0][sidx])])
+	string_index['_offset'] = off
 
 	off = u.offset
 	global_subr_index = u.GetIndex()
-
-	print(['Global Subr INDEX', "%X"%off, global_subr_index])
+	if global_subr_index:
+		global_subr_index['_offset'] = off
 
 	# Read Encoding section if present in Top Dict
 	if 'Encoding' in fonts[0]:
@@ -772,14 +774,13 @@ def TokenizeString(txt):
 		off = u.offset
 
 		charstrings_index = u.GetIndex()
+		charstrings_index['_offset'] = off
 
 		# TODO: ParseCharStrings()
 	except ValueError:
 		off = 0
 		charstrings_index = None
 		pass
-
-	print(['CharStrings INDEX', '%X'%off, charstrings_index])
 
 	if charstrings_index:
 		nGlyphs = charstrings_index['count']
@@ -789,10 +790,9 @@ def TokenizeString(txt):
 			offset = idx
 
 			charsets = u.GetCharsets(idx, nGlyphs)
+			charsets['_offset'] = offset
 		except ValueError:
 			charsets = None
-
-	print(['Charset', '%X'%off, charsets])
 
 	# FDSelect
 	# CharStrings INDEX
@@ -801,5 +801,15 @@ def TokenizeString(txt):
 	# Local Subr INDEX
 	# Copyright and trademark notices
 
-	raise NotImplementedError()
+	ret = {}
+	ret['unpacker'] = u
+	ret['Header'] = header
+	ret['Name INDEX'] = name_index
+	ret['Top DICT INDEX'] = top_dict_index
+	ret['String INDEX'] = string_index
+	ret['Global Subr INDEX'] = global_subr_index
+	ret['Encoding'] = None
+	ret['CharStrings INDEX'] = charstrings_index
+	ret['Charset'] = charsets
+	return ret
 

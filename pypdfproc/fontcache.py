@@ -249,8 +249,10 @@ class Type0FontCache:
 				ff3 = subf.FontDescriptor.FontFile3
 
 				print(['fontfile3', ff3])
-				t = parser.CFFTokenizer()
-				t.TokenizeString(ff3.Stream)
+				t = parser.CFFTokenizer(ff3.Stream)
+				t.Parse()
+				t.DumpBinary()
+				raise NotImplementedError()
 
 
 		if not cmap.CMapper:
