@@ -481,30 +481,23 @@ class _CFFUnpacker:
 			raise ValueError("Unexpected offSize value: %d" % offSize)
 
 	def GetHeader(self):
-		#print(['offset', self.offset])
 		header = {}
 		header['major'] = self.Get8()
 		header['minor'] = self.Get8()
 		header['hdrSize'] = self.Get8()
 		header['offSize'] = self.GetOffSize()
 
-		#print(['offset a', self.offset])
-
 		return header
 
 	def GetIndex(self):
 		index = {}
-		#print(['offset a', self.offset])
 
 		index['count'] = self.Get16()
 		if index['count'] == 0:
 			return
-		#print(['offset b', self.offset])
 
 		index['offSize'] = self.GetOffSize()
-		#print(['offset c', self.offset])
 		offsets = self.GetOffsets(index['offSize'], index['count']+1)
-		#print(['offset d', self.offset])
 
 		index['offsets'] = []
 		index['data'] = []
@@ -521,7 +514,6 @@ class _CFFUnpacker:
 
 		# Last offset is the jump over the data
 		self.offset += offsets[-1] -1
-		#print(['offset e', self.offset])
 
 		return index
 
