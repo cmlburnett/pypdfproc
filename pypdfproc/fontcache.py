@@ -252,6 +252,7 @@ class Type0FontCache:
 				t = parser.CFFTokenizer(ff3.Stream)
 				t.Parse()
 				t.DumpBinary()
+				print(t.tzdat['unpacker']['Top Dict INDEX'])
 				raise NotImplementedError()
 
 
