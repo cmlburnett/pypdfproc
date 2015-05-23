@@ -58,9 +58,48 @@ class FontMetricsData:
 		dat = t.Parse()
 		self.__dict__.update(dat)
 
+	def GetWidths(self):
+		"""
+		Gets all widths for all characters provided, indexed by character name.
+		Widths are a two-tuple of horizontal and vertical widths.
+		Vertical may not apply to all fonts, and it is represented as zero.
+		"""
+
+		ret = {}
+
+		for k,v in self.CharMetrics.items():
+			ret[k] = v['W']
+
+		return ret
+
+	def GetWidthsX(self):
+		"""
+		Gets all horizontal widths for all characters provided, indexed by character name.
+		"""
+
+		ret = {}
+
+		for k,v in self.CharMetrics.items():
+			ret[k] = v['W'][0]
+
+		return ret
+
+	def GetWidthsY(self):
+		"""
+		Gets all vertical widths for all characters provided, indexed by character name.
+		"""
+
+		ret = {}
+
+		for k,v in self.CharMetrics.items():
+			ret[k] = v['W'][1]
+
+		return ret
+
 	def GetWidth(self, charname):
 		"""
 		Get the widths of the character @charname as a two-tuple of horizontal & vertical widths.
+		Vertical may not apply to all fonts, and it is represented as zero.
 		"""
 
 		if charname not in self.CharMetrics:
@@ -80,6 +119,17 @@ class FontMetricsData:
 			return None
 
 		return ret[0]
+
+	def GetWidthY(self, charname):
+		"""
+		Get the vertical width of character @charname.
+		"""
+
+		ret = self.GetWidth(charname)
+		if ret == None:
+			return None
+
+		return ret[1]
 
 	def GetKerningPairsForChar(self, charname):
 		"""
