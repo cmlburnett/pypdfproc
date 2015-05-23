@@ -58,6 +58,57 @@ class FontMetricsData:
 		dat = t.Parse()
 		self.__dict__.update(dat)
 
+	def GetCharacter(self, val):
+		"""
+		Gets character information based on the value supplied.
+		If @val is an integer, then it is assumed to be a character code.
+		If @val is a string, then it is assumed to be a character name.
+		"""
+
+		if type(val) == int:
+			for k,v in self.CharMetrics:
+				if v['C'] == val:
+					return v
+
+			# Character code not found
+			return None
+
+		elif type(val) == str:
+			if val not in self.CharMetrics:
+				# Character name not found
+				return None
+			else:
+				return self.CharMetrics[val]
+
+		else:
+			raise TypeError("Unrecognized type '%s', need str or int" % str(val))
+
+	def GetLigaturesForward(self, firstchar):
+		"""
+		Gets all ligatures composed by the given character: the first character of the ligature.
+		"""
+
+		ret = []
+
+		for l in self.Ligatures:
+			if l['base'] == firstchar:
+				ret.append(l)
+
+		return ret
+
+	def GetLigaturesBackward(self, ligchar):
+		"""
+		Gets all ligatures where the ligature character is @ligchar.
+		"""
+
+		ret = []
+
+		for l in self.Ligatures:
+			if l['ligature'] == ligchar:
+				ret.append(l)
+
+		return ret
+
 	def GetWidths(self):
 		"""
 		Gets all widths for all characters provided, indexed by character name.
