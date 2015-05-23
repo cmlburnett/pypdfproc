@@ -4,6 +4,7 @@ from . import pdf as pdfloc
 from . import text as textloc
 from . import cmap as cmaploc
 from . import cff as cffloc
+from . import fontmetrics as fmloc
 from .state import StateManager, State, Mat3x3, Pos
 
 from .. import pdf as _pdf
@@ -74,6 +75,25 @@ def _readlinerev(f):
 
 	return f[0:endidx]
 
+def cuttokens(toks, starttok, endtok):
+	start,end = None,None
+
+	for i in range(len(toks)):
+		tok = toks[i]
+
+		if tok.type == starttok:
+			start = i
+		elif tok.type == endtok:
+			end = i
+
+		if start and end:
+			break
+
+	pretoks = toks[:start]
+	subtoks = toks[start:end+1]
+	endtoks = toks[end+1:]
+
+	return (pretoks+endtoks,subtoks)
 
 class PDFTokenizer:
 	"""
@@ -867,6 +887,106 @@ class CFFTokenizer:
 	def get_version(self):
 		return (self.tzdat['Header']['major'], self.tzdat['Header']['minor'])
 	version = property(get_version)
+
+class FontMetricsTokenizer:
+
+	def __init__(self, txt):
+		self.txt = txt
+
+		self.Comments = []
+
+	def Parse(self):
+		tokens = fmloc.TokenizeString(self.txt)
+
+		tokens,charmetrics = cuttokens(tokens, 'StartCharMetrics', 'EndCharMetrics')
+		tokens,kerndata = cuttokens(tokens, 'StartKernData', 'EndKernData')
+
+		kerndata,kernpairs = cuttokens(kerndata, 'StartKernPairs', 'EndKernPairs')
+
+		if False:
+			print('----------')
+			print(tokens)
+			print('----------')
+			print(charmetrics)
+			print('----------')
+			print(kerndata)
+			print('----------')
+			print(kernpairs)
+			print('----------')
+
+		ret = {}
+		ret['Comments'] = []
+		ret['CharMetrics'] = {}
+		ret['Ligatures'] = []
+		ret['Kerning'] = {}
+		ret['Kerning']['Pairs'] = {}
+
+		# Everything leftover
+		for tok in tokens:
+			if tok.type == 'StartFontMetrics':		ret['FMVersion'] = tok.value
+			elif tok.type == 'EndFontMetrics':		pass
+
+			elif tok.type == 'Ascender':			ret['Ascender'] = tok.value
+			elif tok.type == 'CapHeight':			ret['CapHeight'] = tok.value
+			elif tok.type == 'COMMENT':				ret['Comments'].append(tok.value)
+			elif tok.type == 'CharacterSet':		ret['CharacterSet'] = tok.value
+			elif tok.type == 'Descender':			ret['Descender'] = tok.value
+			elif tok.type == 'EncodingScheme':		ret['EncodingScheme'] = tok.value
+			elif tok.type == 'FontBBox':			ret['FontBBox'] = tok.value
+			elif tok.type == 'FontName':			ret['FontName'] = tok.value
+			elif tok.type == 'FullName':			ret['FullName'] = tok.value
+			elif tok.type == 'FamilyName':			ret['FamilyName'] = tok.value
+			elif tok.type == 'IsFixedPitch':		ret['IsFixedPitch'] = tok.value
+			elif tok.type == 'ItalicAngle':			ret['ItalicAngle'] = tok.value
+			elif tok.type == 'Notice':				ret['Notice'] = tok.value
+			elif tok.type == 'StdHW':				ret['StdHW'] = tok.value
+			elif tok.type == 'StdVW':				ret['StdVW'] = tok.value
+			elif tok.type == 'UnderlinePosition':	ret['UnderlinePosition'] = tok.value
+			elif tok.type == 'UnderlineThickness':	ret['UnderlineThickness'] = tok.value
+			elif tok.type == 'Version':				ret['Version'] = tok.value
+			elif tok.type == 'Weight':				ret['Weight'] = tok.value
+			elif tok.type == 'XHeight':				ret['XHeight'] = tok.value
+			else:
+				raise TypeError("Unrecognized token: '%s'" % tok)
+
+		lastchar = None
+		curchar = {}
+		for tok in charmetrics:
+			if tok.type == 'StartCharMetrics':		pass
+			elif tok.type == 'EndCharMetrics':		pass
+			elif tok.type == 'SemiColon':			pass
+
+			elif tok.type == 'C':
+				if len(curchar):
+					ret['CharMetrics'][curchar['N']] = curchar
+					lastchar = curchar
+					curchar = {}
+
+				curchar['C'] = tok.value
+			elif tok.type == 'WX':					curchar['W'] = (tok.value, 0)
+			elif tok.type == 'N':					curchar['N'] = tok.value
+			elif tok.type == 'B':					curchar['B'] = tok.value
+			elif tok.type == 'L':
+				l = {}
+				l['base'] = lastchar
+				l['successor'] = tok.value[0]
+				l['ligature'] = tok.value[1]
+				ret['Ligatures'].append(l)
+
+			else:
+				raise TypeError("Unrecognized token: '%s'" % tok)
+
+		for tok in kernpairs:
+			if tok.type == 'StartKernPairs':		pass
+			elif tok.type == 'EndKernPairs':		pass
+
+			elif tok.type == 'KPX':
+				ret['Kerning']['Pairs'][tok.value[0]] =		(tok.value[1], 0)
+			else:
+				raise TypeError("Unrecognized token: '%s'" % tok)
+
+		return ret
+
 
 class TokenHelpers:
 	@staticmethod
