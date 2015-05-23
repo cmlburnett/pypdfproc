@@ -36,7 +36,7 @@ packages = [
 	"pypdfproc",
 	"pypdfproc.parser",
 ]
-package_data = {'': 'StandardFonts_AFM.zip'}
+package_data = {'pypdfproc': ['StandardFonts_AFM.zip']}
 data_files = [
 	('pypdfproc', [
 							'pypdfproc/__init__.py',
@@ -75,6 +75,7 @@ setup_params = dict(
 	url=url,
 	license=cp_license,
 	packages=packages,
+	package_data=package_data,
 	data_files=data_files,
 	scripts=scripts,
 )
