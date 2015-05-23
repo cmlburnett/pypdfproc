@@ -15,6 +15,7 @@ tokens = (
 	'LIT_START',
 	'LIT_END',
 	'NAME',
+	'COMMENT',
 
 	'CODE',
 
@@ -26,17 +27,20 @@ tokens = (
 	'currentdict',
 	'defineresource',
 	'pop',
+	'dup',
 
 	'begin',
 	'begincmp',
 	'beginbfchar',
 	'beginbfrange',
+	'begincidrange',
 	'begincodespacerange',
 
 	'end',
 	'endcmp',
 	'endbfchar',
 	'endbfrange',
+	'endcidrange',
 	'endcodespacerange',
 )
 
@@ -55,17 +59,20 @@ t_CMapName =			r'CMapName'
 t_currentdict =			r'currentdict'
 t_defineresource =		r'defineresource'
 t_pop =					r'pop'
+t_dup =					r'dup'
 
 t_begin =				r'begin'
 t_begincmp =			r'begincmp'
 t_beginbfchar =			r'beginbfchar'
 t_beginbfrange =		r'beginbfrange'
+t_begincidrange =		r'begincidrange'
 t_begincodespacerange =	r'begincodespacerange'
 
 t_end =					r'end'
 t_endcmp =				r'endcmp'
 t_endbfchar =			r'endbfchar'
 t_endbfrange =			r'endbfrange'
+t_endcidrange =			r'endcidrange'
 t_endcodespacerange =	r'endcodespacerange'
 
 
@@ -105,6 +112,13 @@ def t_CODE(t):
 	r'\<[0-9A-Fa-f]+\>'
 
 	t.value = int(t.value[1:-1], 16)
+	return t
+
+def t_COMMENT(t):
+	r'%[^\r\n]*'
+
+	# Strip % indicating comment
+	t.value = t.value[1:]
 	return t
 
 # Ignore nothing, whitespace is handled above

@@ -754,37 +754,42 @@ def TokenizeString(txt):
 	if global_subr_index:
 		global_subr_index['_offset'] = off
 
-	# Read Encoding section if present in Top Dict
-	if 'Encoding' in fonts[0]:
-		raise NotImplementedError("Encoding handling not implemented yet")
+	charsets = []
+	charstrings_indexes = []
+	for fidx in range(len(fonts)):
+		# Read Encoding section if present in Top Dict
+		if 'Encoding' in fonts[0]:
+			raise NotImplementedError("Encoding handling not implemented yet")
 
-	try:
-		# Find index for CharStrings...
-		idx = fonts[0].index('CharStrings')
-		# ...and the offset is the value prior to it in the list
-		u.offset = fonts[0][idx-1]
-		off = u.offset
-
-		charstrings_index = u.GetIndex()
-		charstrings_index['_offset'] = off
-
-		# TODO: ParseCharStrings()
-	except ValueError:
-		off = 0
-		charstrings_index = None
-		pass
-
-	if charstrings_index:
-		nGlyphs = charstrings_index['count']
-		# Read charsets section if present in Top Dict
 		try:
-			idx = fonts[0].index('charset')
-			offset = idx
+			# Find index for CharStrings...
+			idx = fonts[0].index('CharStrings')
+			# ...and the offset is the value prior to it in the list
+			u.offset = fonts[0][idx-1]
+			off = u.offset
 
-			charsets = u.GetCharsets(idx, nGlyphs)
-			charsets['_offset'] = offset
+			charstrings_index = u.GetIndex()
+			charstrings_index['_offset'] = off
+			charstrings_indexes.append(charstrings_index)
+
+			# TODO: ParseCharStrings()
 		except ValueError:
-			charsets = None
+			off = 0
+			charstrings_index = None
+			pass
+
+		if charstrings_index:
+			nGlyphs = charstrings_index['count']
+			# Read charsets section if present in Top Dict
+			try:
+				idx = fonts[0].index('charset')
+				offset = idx
+
+				charset = u.GetCharsets(idx, nGlyphs)
+				charset['_offset'] = offset
+			except ValueError:
+				charset = None
+			charsets.append(charset)
 
 	# FDSelect
 	# CharStrings INDEX
@@ -801,7 +806,7 @@ def TokenizeString(txt):
 	ret['String INDEX'] = string_index
 	ret['Global Subr INDEX'] = global_subr_index
 	ret['Encoding'] = None
-	ret['CharStrings INDEX'] = charstrings_index
+	ret['CharStrings INDEX'] = charstrings_indexes
 	ret['Charset'] = charsets
 	return ret
 

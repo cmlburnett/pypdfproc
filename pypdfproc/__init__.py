@@ -7,12 +7,16 @@ __version__ = "1.0.0"
 __all__ = ['parser']
 
 # System libs
-import mmap
+import mmap, os
 
 # Local files
 from . import parser
 from . import pdf as _pdf
 from .fontcache import FontCache, CIDWidthArrayToMap
+from .fontmetrics import FontMetricsManager
+from .stdfonts import StandardFonts
+
+STANDARD_FONT_AFM_ZIP = "StandardFonts_AFM.zip"
 
 def isindirect(o):
 	return isinstance(o, _pdf.IndirectObject)
@@ -32,6 +36,16 @@ class PDF:
 
 	# Font cache keeps track of glyph information, etc.
 	fonts = None
+
+	_StandardFonts = None
+	def get_StandardFonts(self):
+		if self._StandardFonts == None:
+			dname = os.path.dirname(__file__)
+			self._StandardFonts = StandardFonts()
+			self._StandardFonts.AddZip(dname + '/' + STANDARD_FONT_AFM_ZIP)
+
+		return self._StandardFonts
+	StandardFonts = property(get_StandardFonts, doc="Gets the StandardFonts object, loaded only until it's needed")
 
 	def __init__(self, fname):
 		# Copy the file name
@@ -125,6 +139,44 @@ class PDF:
 
 	def GetFontWidths(self, f):
 		if f.Subtype in ('TrueType', 'Type1'):
+			# Not found, find from standard font
+			if f.Widths == None:
+				fm = self.StandardFonts.GetFontMetrics(f.BaseFont)
+				# NB: this is a dictionary indexed by character name
+				wids = fm.GetWidths()
+				#print(['w', wids])
+
+				mincid = 256
+				maxcid = 0
+
+				by_cname = {}
+				for cname in wids.keys():
+					c = fm.GetCharacter(cname)
+					if c['C'] == -1: continue
+
+					by_cname[cname] = c
+
+					if c['C'] < mincid: mincid = c['C']
+					if c['C'] > maxcid: maxcid = c['C']
+
+				# If they are not provided, then the min and max character ids need to be determined
+				if f.FirstChar == None:		f.FirstChar = mincid
+				if f.LastChar == None:		f.LastChar = maxcid
+
+				by_cid = {}
+				for wcname in wids.keys():
+					if wcname not in by_cname: continue
+
+					w = by_cname[wcname]
+					cid = w['C']
+					if cid >= f.FirstChar and cid <= f.LastChar:
+						by_cid[cid] = w['W'][0]
+
+				cids = list(by_cid.keys())
+				cids.sort()
+				f.Widths = [by_cid[cid] for cid in cids]
+
+
 			return f.Widths
 
 		elif f.Subtype == 'Type0':
@@ -309,6 +361,8 @@ class PDF:
 			elif tok.type == 'CS':		s.S.colorspace = (tok.value[0].value, s.S.colorspace[1])
 			elif tok.type == 'sc':		s.S.color = (s.S.color[0], tok.value[0].value)
 			elif tok.type == 'SC':		s.S.color = (tok.value[0].value, s.S.color[1])
+			elif tok.type == 'scn':		s.S.color = (s.S.color[0], tok.value[0].value)
+			elif tok.type == 'SCN':		s.S.color = (tok.value[0].value, s.S.color[1])
 			elif tok.type == 'G':		s.S.do_G(tok.value[0].value)
 			elif tok.type == 'g':		s.S.do_g(tok.value[0].value)
 			elif tok.type == 'RG':		s.S.do_RG(*[t.value for t in tok.value])
@@ -407,8 +461,16 @@ class PDF:
 
 				w = self.GetFontWidths(f)
 
-				w = [v for v in w if v != 0]
-				state['widths'] = {'avg': sum(w)/float(len(w)), 'min': min(w), 'max': max(w)}
+				if type(w) == dict:
+					# Dict is keyed on character name with (horizontal, vertical) 2-tuple widths
+					w = [v[0] for v in list(w.values()) if v[0] != 0]
+					state['widths'] = {'avg': sum(w)/float(len(w)), 'min': min(w), 'max': max(w)}
+				elif type(w) == list or type(w) == _pdf.Array:
+					w = [v for v in w if v != 0]
+					state['widths'] = {'avg': sum(w)/float(len(w)), 'min': min(w), 'max': max(w)}
+				else:
+					raise TypeError("Unrecognized widths object type: '%s'" % str(w))
+
 
 			elif action == 'glyph draw':
 				x,y = args[0]

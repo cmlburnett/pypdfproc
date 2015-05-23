@@ -1,4 +1,4 @@
-import os
+import os, struct
 
 from . import pdf as pdfloc
 from . import text as textloc
@@ -9,7 +9,12 @@ from .state import StateManager, State, Mat3x3, Pos
 
 from .. import pdf as _pdf
 
-__all__ = ['PDFTokenizer', 'TextTokenizer', 'CMapTokenizer', 'State']
+__all__ = ['PDFTokenizer', 'TextTokenizer', 'CMapTokenizer', 'CFFTokenizer', 'ObjectStreamTokenizer', 'FontMetricsTokenizer', 'State']
+
+# --------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------------
 
 def gotoend(f):
 	"""
@@ -89,11 +94,20 @@ def cuttokens(toks, starttok, endtok):
 		if start and end:
 			break
 
+	# Not found
+	if start == None or end == None:
+		return toks,None
+
 	pretoks = toks[:start]
 	subtoks = toks[start:end+1]
 	endtoks = toks[end+1:]
 
 	return (pretoks+endtoks,subtoks)
+
+# --------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------------
 
 class PDFTokenizer:
 	"""
@@ -134,16 +148,31 @@ class PDFTokenizer:
 		# Iterate backward until first "xref" is found, which is followed by the end trailer
 		lines = []
 		while True:
-			line = readlinerev(self.file).decode('latin-1').rstrip()
+			l = readlinerev(self.file)
+			if l == None:
+				print(lines)
+				raise Exception("Unable to finish reading backward to find xref: offset=%d" % self.file.tell())
 
-			if line == "xref":
+			line = l.decode('latin-1').rstrip()
+			lines.append(line)
+
+			if line == "startxref":
 				break
 
-		# This offset is the start of the last xref/trailer combo in the file.
-		# Parsing this xref/trailer combo permits chained parsing of linked xref/trailers
-		# throughout the file.
-		offset = self.file.tell()
-		offset += 1
+		lines.reverse()
+
+		toks = pdfloc.TokenizeString("\r\n".join(lines))
+		toks = pdfloc.ConsolidateTokens(toks)
+		#print(['toks start', toks])
+
+		if toks[0].type != 'xref_start':	raise TypeError("Expected xref_start token, got '%s' instead" % toks[0].type)
+		if toks[1].type != 'INT':			raise TypeError("Expected int token, got '%s' instead" % toks[1].type)
+		if toks[2].type != 'EOF':			raise TypeError("Expected EOF token, got '%s' instead" % toks[2].type)
+
+		offset = toks[1].value
+
+		x = None
+		t = None
 
 		prevx = None
 		prevt = None
@@ -151,31 +180,48 @@ class PDFTokenizer:
 		# Iterate until startxref in the trialer is zero, which means the end of the chain
 		while offset != 0:
 			# Parse xref
-			x = self.ParseXref(offset)
+			x = self.ParseXRef(offset)
 			self.pdf.AddContentToMap(offset, x)
-			offset = self.file.tell()
 
-			# Parse trailer that follows the xref section
-			t = self.ParseTrailer(offset)
-			self.pdf.AddContentToMap(offset, t)
+			if isinstance(x, _pdf.XRefStream):
+				# XRef stream doesn't have a trailer associated, so skip to next ("Prev" in PDF nomenclature) xref/trailer combo
+				if 'Prev' in x.Dict:
+					offset = x.Dict['Prev']
+				else:
+					# Done
+					offset = 0
 
-			# Cross-link these
-			x.trailer = t
-			t.xref = x
+			elif isinstance(x, _pdf.XRef):
+				offset = self.file.tell()
 
-			# Next xref is located here (if zero then no more)
-			offset = t.startxref.offset
+				# Parse trailer that follows the xref section
+				t = self.ParseTrailer(offset)
+				self.pdf.AddContentToMap(offset, t)
 
-			# If there's only one xref/trailer combo then this could lead to recursively looping if this was not checked
-			if offset > 0 and offset in self.pdf.contents:
-				break
+				# Cross-link these
+				x.trailer = t
+				t.xref = x
+
+				# Next xref is located here (if zero then no more)
+				if 'Prev' in t.dictionary:
+					offset = t.dictionary['Prev']
+				else:
+					offset = t.startxref.offset
+
+			else:
+				raise TypeError("Unrecognized xref object type: %s" % x)
+
+			#print(['x', x])
+			#print(['t', t])
+			#print(['offset', offset])
 
 			# Link this xref/trailer combo to previous combo
 			x.prev = prevx
-			t.prev = prevt
+			if t: t.prev = prevt
 
 			# Need to set root xref section in PDF object (this means prevx has not been set yet, so it is None)
-			if prevx == None:	self.pdf.rootxref = x
+			if prevx == None:
+				self.pdf.rootxref = x
 
 			# Link previous xref/trailer combo to this combo
 			if prevx != None:	prevx.next = x
@@ -183,7 +229,11 @@ class PDFTokenizer:
 
 			# Save to link them in next iteration
 			prevx = x
-			prevt = t
+			if t: prevt = t
+
+			# If there's only one xref/trailer combo then this could lead to recursively looping if this was not checked
+			if offset > 0 and offset in self.pdf.contents:
+				break
 
 		# Now that all xrefs have been read, create the xref map to permit fast access
 		self.pdf.MakeXRefMap()
@@ -219,7 +269,7 @@ class PDFTokenizer:
 		h.version = parts[1]
 		return h
 
-	def ParseXref(self, offset):
+	def ParseXRef(self, offset):
 		"""
 		Parses an xref section into a pdf.XRef object that represents all of the objectid to offset maps.
 		"""
@@ -227,11 +277,50 @@ class PDFTokenizer:
 		# Jump to trailer
 		self.file.seek(offset)
 
+		# Read first line to check if it's an xref stream
+		line = self.file.readline().decode('latin-1').strip()
+
+		# Regardless, go back to start
+		# 1) If it's an xref stream then _LoadObject needs to start fromt he object definition (i.e., "INT INT obj")
+		# 2) If it's a plaintext xref table then that also needs to be from the given offset
+		self.file.seek(offset)
+
+		# Check if found an object definition (i.e., "INT INT obj")
+		toks = pdfloc.TokenizeString(line)
+		if len(toks) == 3 and toks[0].type == 'INT' and toks[1].type == 'INT' and toks[2].type == 'obj':
+			objidgen = (toks[0].value, toks[1].value)
+
+			return self.ParseXRef_stream(offset, objidgen)
+
+		# Not an object so assume a plaintext xref section
+		else:
+			return self.ParseXRef_plaintext(offset)
+
+	def ParseXRef_stream(self, offset, objidgen):
+		# Move to proper offset
+		self.file.seek(offset)
+
+		# Read the xref stream object
+		toks = self._LoadObject()
+		toks = pdfloc.ConsolidateTokens(toks)
+
+		# Get _pdf.XRefStream object
+		return self._ParseXRefStream(objidgen, toks)
+
+	def ParseXRef_plaintext(self, offset):
+		# Move to proper offset
+		self.file.seek(offset)
+
 		# Iterate backward until "trailer" is found then stop
 		lines = []
 		while True:
 			preoffset = self.file.tell()
-			line = self.file.readline().decode('latin-1').rstrip()
+			line = self.file.readline()
+			if not len(line):
+				raise ValueError("Reached end-of-file before xref was read")
+
+			line = line.decode('latin-1').rstrip()
+			#print(['line', line])
 
 			if line == "trailer":
 				self.file.seek(preoffset)
@@ -258,8 +347,12 @@ class PDFTokenizer:
 		# Iterate until %%EOF indicating end of trailer
 		lines = []
 		while True:
-			line = self.file.readline().decode('latin-1').rstrip()
-			# Always append %%EOF
+			line = self.file.readline()
+			if not len(line):
+				raise ValueError("Reached end-of-file before trailer was read")
+
+			line = line.decode('latin-1').rstrip()
+			#print(['line', line])
 			lines.append(line)
 
 			if line == "%%EOF":
@@ -274,20 +367,62 @@ class PDFTokenizer:
 
 
 
-	def LoadObject(self, objid, generation, handler=None):
+	def LoadObject(self, objid, handler=None):
 		"""
 		Loads an object, regardless of cache, as a token stream if handler is not provided.
 		"""
 
-		k = (objid, generation)
 
-		if k not in self.pdf.objmap:
-			raise ValueError("Object %d (generation %d) not found in file" % (objid, generation))
+		# Convert to tuple
+		if isinstance(objid, _pdf.IndirectObject):
+			objid = (objid.objid, objid.generation)
+
+		if objid not in self.pdf.objmap:
+			raise ValueError("Object %d (generation %d) not found in file" % (objid[0], objid[1]))
 
 		# Get offset and seek to it
-		offset = self.pdf.objmap[k]
-		self.file.seek(offset)
+		offset = self.pdf.objmap[objid]
+		#print('--------- LOAD OBJECT %s (offset %s) ----------' % (objid, offset))
+		if type(offset) == int:
+			self.file.seek(offset)
 
+			# All this does is read from offset until the end of the object
+			toks = self._LoadObject()
+
+			# Consolidate tokens
+			toks = pdfloc.ConsolidateTokens(toks)
+
+		elif type(offset) == tuple:
+			stream_oid = offset[0]
+			stream_offset = offset[1]
+
+			# Get stream object
+			so = self.GetObjectStream(stream_oid)
+
+			toks = so.GetObjectTokens(stream_offset)
+			#print(['toks', toks])
+
+		else:
+			raise TypeError("Unrecognized type of offset, expected int or tuple but got '%s'" % offset)
+
+
+		# Process the token stream into something better
+		# The result should not have tokens or any similar concept (separation of layers)
+		if handler != None:
+			o = handler(objid, toks)
+		else:
+			raise NotImplementedError("No handler provided for fetching object %s" % (objid,))
+
+		# Set object ID
+		if isinstance(o, _pdf.PDFBase):
+			o.oid = _pdf.IndirectObject()
+			o.oid.objid = objid[0]
+			o.oid.generation = objid[1]
+
+		# Return processed token stream
+		return o
+
+	def _LoadObject(self):
 		# FIXME: I don't like this solution but it worse for now since I haven't hit objects larger than 768 kB
 		# Read a block and tokenize it
 		dat = self.file.read(768*1024).decode('latin-1')
@@ -328,7 +463,7 @@ class PDFTokenizer:
 				# If it's an indirect then that integer needs to be loaded
 				# Otherwise if it's an integer then nothing else needs to be done
 				if isinstance(dlen, _pdf.IndirectObject):
-					streamlength = self.LoadObject(dlen.objid, dlen.generation, self._ParseInt)
+					streamlength = self.LoadObject(dlen, self._ParseInt)
 				elif type(dlen) == int:
 					streamlength = dlen
 				else:
@@ -336,45 +471,34 @@ class PDFTokenizer:
 
 				# At this point, streamlength should be set and iterating around the loop will find a successful TokenizeString call
 
-		# Consolidate tokens
-		toks = pdfloc.ConsolidateTokens(toks)
+		return toks
 
-		# Process the token stream into something better
-		# The result should not have tokens or any similar concept (separation of layers)
-		if handler != None:
-			o = handler(k, toks)
-		else:
-			raise NotImplementedError()
-
-		# Set object ID
-		if isinstance(o, _pdf.PDFBase):
-			o.oid = (objid, generation)
-
-		# Return processed token stream
-		return o
-
-	def GetObject(self, objid, generation, handler=None):
+	def GetObject(self, objid, handler=None):
 		"""
 		Pull an object from the cache or load it if it's not loaded yet.
 		Must provide a handler to convert raw object data into something meaningful.
 		"""
 
-		k = (objid, generation)
+		#print('--------- GET OBJECT %s ----------' % (objid,))
 
-		# Check the cache first
-		if k in self.pdf.contents:
-			return self.pdf.contents[k]
+		if isinstance(objid, _pdf.IndirectObject):
+			k = (objid.objid, objid.generation)
 
-		# Load object
-		o = self.LoadObject(objid, generation, handler)
+			# Check the cache first
+			if k in self.pdf.contents:
+				return self.pdf.contents[k]
 
-		# Store in cache
-		self.pdf.contents[k] = o
+			# Load object
+			o = self.LoadObject(objid, handler)
 
-		# Return object
-		return o
+			# Store in cache
+			self.pdf.contents[k] = o
 
+			# Return object
+			return o
 
+		else:
+			raise TypeError("Expected objid type, got '%s'" % (objid,))
 
 	def FindRootObject(self):
 		"""
@@ -382,16 +506,19 @@ class PDFTokenizer:
 		"""
 
 		x = self.pdf.rootxref
-		t = x.trailer
 
 		while x != None:
-			if 'Root' in t.dictionary:
-				v = t.dictionary['Root']
-				# This should be an indirect
-				return v
+			if isinstance(x, _pdf.XRef):
+				if 'Root' in x.trailer.dictionary:
+					# This should be an indirect
+					return x.trailer.dictionary['Root']
 
-			x = x.next
-			t = t.next
+			elif isinstance(x, _pdf.XRefStream):
+				if 'Root' in x.Dict:
+					return x.Dict['Root']
+
+			else:
+				raise TypeError("Unknown xref object type: %s" % x)
 
 		return None
 
@@ -404,64 +531,78 @@ class PDFTokenizer:
 		if ind == None:
 			raise ValueError("Failed to find root catalog node")
 
-		return self.GetObject(ind.objid, ind.generation, self._ParseCatalog)
+		return self.GetObject(ind, self._ParseCatalog)
 
 	def GetArray(self, ind):
-		return self.GetObject(ind.objid, ind.generation, self._ParseArray)
+		return self.GetObject(ind, self._ParseArray)
 
 	def GetDictionary(self, ind):
-		return self.GetObject(ind.objid, ind.generation, self._ParseDictionary)
+		return self.GetObject(ind, self._ParseDictionary)
+
+	def GetObjectStream(self, ind):
+		return self.GetObject(ind, self._ParseObjectStream)
 
 	def GetPageTreeNode(self, ind):
-		return self.GetObject(ind.objid, ind.generation, self._ParsePageTreeNode)
+		return self.GetObject(ind, self._ParsePageTreeNode)
 
 	def GetPageTreeNodeOrPage(self, ind):
-		return self.GetObject(ind.objid, ind.generation, self._ParsePageTreeNodeOrPage)
+		return self.GetObject(ind, self._ParsePageTreeNodeOrPage)
 
 	def GetPage(self, ind):
-		return self.GetObject(ind.objid, ind.generation, self._ParsePage)
+		return self.GetObject(ind, self._ParsePage)
 
 	def GetNumberTreeNode(self, ind):
-		return self.GetObject(ind.objid, ind.generation, self._ParseNumberTreeNode)
+		return self.GetObject(ind, self._ParseNumberTreeNode)
 
 	def GetContent(self, ind):
-		return self.GetObject(ind.objid, ind.generation, self._ParseContent)
+		return self.GetObject(ind, self._ParseContent)
 
 	def GetResource(self, ind):
-		return self.GetObject(ind.objid, ind.generation, self._ParseResource)
+		return self.GetObject(ind, self._ParseResource)
 
 	def GetColorSpace(self, ind):
-		return self.GetObject(ind.objid, ind.generation, self._ParseColorSpace)
+		return self.GetObject(ind, self._ParseColorSpace)
 
 	def GetGraphicsState(self, ind):
-		return self.GetObject(ind.objid, ind.generation, self._ParseGraphicsState)
+		return self.GetObject(ind, self._ParseGraphicsState)
 
 	def GetFont(self, ind):
-		return self.GetObject(ind.objid, ind.generation, self._ParseFont)
+		return self.GetObject(ind, self._ParseFont)
 
 	def GetFontDescriptor(self, ind):
-		return self.GetObject(ind.objid, ind.generation, self._ParseFontDescriptor)
+		return self.GetObject(ind, self._ParseFontDescriptor)
 
 	def GetFontEncoding(self, ind):
-		return self.GetObject(ind.objid, ind.generation, self._ParseFontEncoding)
+		return self.GetObject(ind, self._ParseFontEncoding)
 
 	def GetFontToUnicode(self, ind):
-		return self.GetObject(ind.objid, ind.generation, self._ParseFontToUnicode)
+		return self.GetObject(ind, self._ParseFontToUnicode)
 
 	def GetFontWidths(self, ind):
-		return self.GetObject(ind.objid, ind.generation, self._ParseArray)
+		return self.GetObject(ind, self._ParseArray)
 
 	def GetFontFile2(self, ind):
-		return self.GetObject(ind.objid, ind.generation, self._ParseFontFile2)
+		return self.GetObject(ind, self._ParseFontFile2)
 
 	def GetFontFile3(self, ind):
-		return self.GetObject(ind.objid, ind.generation, self._ParseFontFile3)
+		return self.GetObject(ind, self._ParseFontFile3)
 
 	def GetXObject(self, ind):
-		return self.GetObject(ind.objid, ind.generation, self._ParseXObject)
+		return self.GetObject(ind, self._ParseXObject)
 
 
 
+
+	def _ParseXRefStream(self, objidgen, tokens):
+		return self._ParseStream(objidgen, tokens, _pdf.XRefStream)
+
+	def _ParseObjectStream(self, objidgen, tokens):
+		o = self._ParseStream(objidgen, tokens, _pdf.ObjectStream)
+
+		# Initialize tokenizer for the object stream so that PDF.GetObject can pry into the stream on-demand
+		o._Processor = ObjectStreamTokenizer(o)
+
+		return o
 
 	def _ParseStream(self, objidgen, tokens, klass=_pdf.Content):
 		d = TokenHelpers.Convert(tokens[0].value[2][0])
@@ -513,16 +654,22 @@ class PDFTokenizer:
 		PageTreeNode.Kids can be PageTreeNode or Page, so must check Type before picking klass.
 		"""
 
-		o = TokenHelpers.Convert(tokens[0].value[2])
-		typ = o[0]['Type']
+		if tokens[0].type == 'OBJECT':
+			o = TokenHelpers.Convert(tokens[0].value[2][0])
+		elif tokens[0].type == 'DICT':
+			o = TokenHelpers.Convert(tokens[0])
+		else:
+			raise TypeError("Unrecognized type for stupid object parser; need dictionary got: '%s'" % tokens[0].type)
+
+		typ = o['Type']
 
 		if typ == 'Pages':		r = _pdf.PageTreeNode(self._DynamicLoader)
 		elif typ == 'Page':		r = _pdf.Page(self._DynamicLoader)
 		else:
 			raise ValueError("Unrecognized object type (%s) for this function: neither Pages nor Page" % typ)
 
-		for k in o[0]:
-			setattr(r, '_' + k, o[0][k])
+		for k in o:
+			setattr(r, '_' + k, o[k])
 
 		return r
 
@@ -558,9 +705,15 @@ class PDFTokenizer:
 		Several subtypes of Font, must switch depending on Subtype
 		"""
 
-		o = TokenHelpers.Convert(tokens[0].value[2])
-		typ = o[0]['Type']
-		styp = o[0]['Subtype']
+		if tokens[0].type == 'OBJECT':
+			o = TokenHelpers.Convert(tokens[0].value[2][0])
+		elif tokens[0].type == 'DICT':
+			o = TokenHelpers.Convert(tokens[0])
+		else:
+			raise TypeError("Unrecognized type for stupid object parser; need dictionary got: '%s'" % tokens[0].type)
+
+		typ = o['Type']
+		styp = o['Subtype']
 
 		if styp == 'Type0':				r = _pdf.Font0(self._DynamicLoader)
 		elif styp == 'Type1':			r = _pdf.Font1(self._DynamicLoader)
@@ -571,8 +724,8 @@ class PDFTokenizer:
 		else:
 			raise ValueError("Unrecognized object type (%s) for this function: neither Type1,  Type3, or TrueType" % styp)
 
-		for k in o[0]:
-			setattr(r, '_' + k, o[0][k])
+		for k in o:
+			setattr(r, '_' + k, o[k])
 
 		return r
 
@@ -625,11 +778,16 @@ class PDFTokenizer:
 		sets the dictionary of data to _Dict so that the object can load objects on demand.
 		"""
 
-		o = TokenHelpers.Convert(tokens[0].value[2])
+		if tokens[0].type == 'OBJECT':
+			o = TokenHelpers.Convert(tokens[0].value[2][0])
+		elif tokens[0].type == 'DICT':
+			o = TokenHelpers.Convert(tokens[0])
+		else:
+			raise TypeError("Unrecognized type for stupid object parser; need dictionary got: '%s'" % tokens[0].type)
 
 		r = klass(self._DynamicLoader)
-		for k in o[0]:
-			setattr(r, '_' + k, o[0][k])
+		for k in o:
+			setattr(r, '_' + k, o[k])
 
 		return r
 
@@ -808,8 +966,9 @@ class CMapTokenizer:
 	def BuildMapper(self, txt):
 		toks = self.TokenizeString(txt)
 
-		# Final map data
+		# Final map data and range data (keys are ranges; value is starting unicode value)
 		mapdat = {}
+		rangedat = {}
 
 		codes = []
 
@@ -818,6 +977,7 @@ class CMapTokenizer:
 		for tok in toks:
 			if tok.type == 'beginbfchar':
 				mapon = True
+				continue
 			if mapon and tok.type == 'endbfchar':
 				mapon = False
 
@@ -830,6 +990,8 @@ class CMapTokenizer:
 			if mapon:
 				if tok.type == 'CODE':
 					codes.append(tok.value)
+				else:
+					raise NotImplementedError("Unrecognized token: '%s'" % str(tok))
 
 		# Handle character range mappings
 		codes = []
@@ -837,6 +999,7 @@ class CMapTokenizer:
 		for tok in toks:
 			if tok.type == 'beginbfrange':
 				mapon = True
+				continue
 			if mapon and tok.type == 'endbfrange':
 				mapon = False
 
@@ -855,6 +1018,33 @@ class CMapTokenizer:
 					codes.append(tok.value)
 				elif tok.type == 'ARR':
 					raise NotImplementedError("Not setup to handle bf range arrays")
+				else:
+					raise NotImplementedError("Unrecognized token: '%s'" % str(tok))
+
+		# Handle cid range mappings
+		ranges = []
+		mapon = False
+		for tok in toks:
+			if tok.type == 'begincidrange':
+				mapon = True
+				continue
+			if mapon and tok.type == 'endcidrange':
+				mapon = False
+
+				for r in ranges:
+					rangedat[ (r[0],r[1]) ] = r[2]
+
+				break
+
+			if mapon:
+				if tok.type == 'CODE':
+					ranges.append(tok.value)
+				elif tok.type == 'INT':
+					e = ranges.pop()
+					s = ranges.pop()
+					ranges.append( (s,e, tok.value) )
+				else:
+					raise NotImplementedError("Unrecognized token: '%s'" % str(tok))
 
 		def mapper(c):
 			if type(c) == int:
@@ -866,8 +1056,15 @@ class CMapTokenizer:
 
 			if cc in mapdat:
 				return mapdat[cc]
-			else:
-				raise KeyError("Cannot map character '%s' (ord %d): not found in map" % (c, cc))
+
+			for r,unistart in rangedat.items():
+				s,e = r
+				if cc >= s and cc <= e:
+					# Find offset of code (@cc) from range start (@s), which is then added to the unicode starting value (@unistart)
+					diff = cc-s
+					return chr(unistart + diff)
+
+			raise KeyError("Cannot map character '%s' (ord %d): not found in map" % (c, cc))
 
 		return mapper
 
@@ -888,8 +1085,71 @@ class CFFTokenizer:
 		return (self.tzdat['Header']['major'], self.tzdat['Header']['minor'])
 	version = property(get_version)
 
-class FontMetricsTokenizer:
+class ObjectStreamTokenizer:
+	N = None
+	First = None
+	ObjectStream = None
+	Tokens = None
+	Objects = None
 
+	def __init__(self, obj):
+		self.ObjectStream = obj
+		self.N = obj.Dict['N']
+		self.First = obj.Dict['First']
+		self.Tokens = None # Delay processing until needed
+		self.Objects = None
+
+	def Process(self):
+		# Delay processing until needed
+		if self.Tokens != None:
+			return self.Tokens
+
+		self.Tokens = pdfloc.TokenizeString(self.ObjectStream.Stream)
+
+		# Objects keyed by offset
+		self.Objects = {}
+
+		# Index objects by their offset in the stream
+		# 1) Pull out the integers that comprise the index of this object stream
+		indexes = self.Tokens[0:(self.N*2)]
+		# 2) Chunk the list of integers into pairs (first is object number; second is offset from self.First)
+		indexes = [ (indexes[i].value,indexes[i+1].value) for i in range(0,len(indexes),2) ]
+		# 3) Add a last placeholder with the full-length of the stream so that step (4) works correctly without running passed the end
+		indexes.append( (None, len(self.ObjectStream.Stream)) )
+		# 4) Basically remake list from (2) and include the ending offset for each object resulting in a list of (object id, (start offset, end offset))
+		indexes = [(indexes[i][0], (indexes[i][1],indexes[i+1][1]-1)) for i in range(len(indexes)-1)]
+
+		for i in range(len(indexes)):
+			idx = indexes[i]
+
+			# Unpack the structure created in (4) above
+			oid, (startidx,endidx) = idx
+
+			# Need to account for offset in which the object data begins (this is after the integer index plus whatever padding the creating app put in between)
+			startidx += self.First
+			endidx += self.First
+
+			# Iterate through entire token range to pull out the tokens whose lexer position is between the start and end indices
+			# NB: this is not all that efficient since the entire token list is iterated through for every object in the stream, however, functioning first and optimize later
+			toks = [ self.Tokens[_] for _ in range(len(self.Tokens)) if (self.Tokens[_].lexpos >= startidx and self.Tokens[_].lexpos <= endidx) ]
+
+			# Map array index to tuple of (object id, tokens)
+			# NB: object type is unknown at this point so no appropriate handler can/should be called,
+			# and since LoadObject is up the stack which does contain the appropriate handler then defer processing of tokens until that point
+			self.Objects[i] = (oid, pdfloc.ConsolidateTokens(toks))
+
+			#print([off, (startidx, endidx), toks, self.Objects[off]])
+			#print([off, (startidx, endidx), self.Objects[off]])
+
+	def GetObjectTokens(self, index):
+		if self.Objects == None:
+			self.Process()
+
+		# Returns the tokens corresponding to this object
+		# NB: the object id in [0] is ignored since the XRefRowCompressed has the object id that led to parsing the object stream
+		return self.Objects[index][1]
+
+class FontMetricsTokenizer:
 	def __init__(self, txt):
 		self.txt = txt
 
@@ -901,18 +1161,15 @@ class FontMetricsTokenizer:
 		tokens,charmetrics = cuttokens(tokens, 'StartCharMetrics', 'EndCharMetrics')
 		tokens,kerndata = cuttokens(tokens, 'StartKernData', 'EndKernData')
 
-		kerndata,kernpairs = cuttokens(kerndata, 'StartKernPairs', 'EndKernPairs')
+		if kerndata != None:
+			kerndata,kernpairs = cuttokens(kerndata, 'StartKernPairs', 'EndKernPairs')
+		else:
+			kernpairs = None
 
-		if False:
-			print('----------')
-			print(tokens)
-			print('----------')
-			print(charmetrics)
-			print('----------')
-			print(kerndata)
-			print('----------')
-			print(kernpairs)
-			print('----------')
+
+		# Could do this, or block the for loop below under an if statement....
+		if kernpairs == None:
+			kernpairs = []
 
 		ret = {}
 		ret['Comments'] = []
@@ -996,6 +1253,7 @@ class TokenHelpers:
 			return [TokenHelpers.Convert(p) for p in tok]
 
 
+		#print(['tok', tok])
 		if tok.type in ('NAME', 'INT', 'FLOAT'):
 			return tok.value
 		elif tok.type == 'HEXSTRING':
@@ -1033,11 +1291,10 @@ class TokenHelpers:
 		x.offsets = []
 
 		for row in toks[0].value:
-			me = _pdf.XRefMapEntry()
-			me.objid = row[0]
-			me.offset = row[1]
-			me.generation = row[2]
-			me.inuse = row[3] == 'n' # n=in use, f=free
+			if row[3] == 'n':
+				me = _pdf.XRefRowUsed(objid=row[0], offset=row[1], generation=row[2])
+			else:
+				me = _pdf.XRefRowFree(objid=row[0], generation=row[2])
 
 			x.offsets.append(me)
 
@@ -1045,6 +1302,7 @@ class TokenHelpers:
 
 	@staticmethod
 	def Convert_Trailer(toks):
+		#print(['toks', toks])
 		t = _pdf.Trailer()
 		t.dictionary = TokenHelpers.Convert_Dictionary(toks[0].value[0])
 		t.startxref =  TokenHelpers.Convert_StartXRef(toks[0].value[1:3])

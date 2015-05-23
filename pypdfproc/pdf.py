@@ -3,7 +3,7 @@ PDF classes that represent Carousel object information but in python form.
 No references to underlying parsing is made.
 """
 
-import zlib
+import struct, zlib
 
 class PDF:
 	"""
@@ -53,7 +53,10 @@ class PDF:
 		meaning that this correctly handles incremental updates to objects.
 		"""
 
-		# Reset map
+		# Object map maps a (object id, generation) tuple to the offset within the file
+		# If the value is a tuple then it's a reference to an object within an object stream and
+		#  the structure of the tuple is ( (stream id, generation), offset ) where offset is within
+		#  that object stream
 		self.objmap = {}
 
 		# Pull out first xref/trailer combo
@@ -62,24 +65,68 @@ class PDF:
 
 		# Iterate until no more xref/trailer combos
 		while x != None:
-			# Iterate through offsets in xref and make map to objects
-			for me in x.offsets:
-				# Ignore if object is marked free
-				if not me.inuse:
-					continue
+			if isinstance(x, XRef):
+				# Iterate through offsets in xref and make map to objects
+				for me in x.offsets:
+					# Ignore if object is marked free
+					if me.__class__ == XRefRowFree:
+						continue
 
-				# Key to index offset by
-				p = (me.objid, me.generation)
-				if p in self.objmap:
-					# Already exists which means the me.offset is the old object and self.objmap[p] is the newer object
-					pass
-				else:
-					# Object not mapped yet so map it to the offset
-					self.objmap[p] = me.offset
+					# Key to index offset by
+					p = (me.objid, me.generation)
+					if p in self.objmap:
+						# Already exists which means the me.offset is the old object and self.objmap[p] is the newer object
+						pass
+					else:
+						# Object not mapped yet so map it to the offset
+						self.objmap[p] = me.offset
 
-			# Jump to next xref/trailer combo (last one will set x to None and stop iteration)
-			x = x.next
-			t = t.next
+				# Jump to next xref/trailer combo (last one will set x to None and stop iteration)
+				x = x.next
+				t = t.next
+
+			elif isinstance(x, XRefStream):
+				for me in x.StreamRows:
+
+					if isinstance(me, XRefRowFree):
+						# Nothing to do
+						continue
+
+					elif isinstance(me, XRefRowUsed):
+						p = (me.objid, me.generation)
+						if p in self.objmap:
+							# Already exists which means the me.offset is the old object and self.objmap[p] is the newer object
+							pass
+						else:
+							# Object not mapped yet so map it to the offset
+							self.objmap[p] = me.offset
+
+					elif isinstance(me, XRefRowCompressed):
+						p = IndirectObject()
+						p.objid = me.objstreamid
+						p.generation = 0
+
+						k = (me.objid,0)
+
+						if k in self.objmap:
+							# Already exists which means the me.offset is the old object and self.objmap[k] is the newer object
+							pass
+						else:
+							# Object not mapped yet so map it to the offset
+
+							# Tuple indicates object stream reference
+							# Object stream is (me.objstreamid,0) as generation zero is assumed
+							# The offset is within the object stream
+							self.objmap[k] = ( p, me.objstreamoffset)
+
+					else:
+						raise TypeError("Unrecognized xref object type: %s" % me)
+
+				x = x.next
+				t = None
+
+			else:
+				raise TypeError("Unrecognized xref object type: %s" % x)
 
 
 class PDFBase:
@@ -123,6 +170,19 @@ class Array(PDFBase):
 	def __repr__(self):				return str(self)
 	def __str__(self):				return "<%s %s>" % (self.__class__.__name__, str(self.array))
 
+class DoubleIndirectObject(PDFBase):
+	"""
+	This object represents an indirect object reference whose object is stored in an object stream.
+	Thus, it points to an object stream then an object index within that stream.
+	"""
+
+	#objid = None
+	objstreamid = None
+	objstreamoffset = None
+
+	def __repr__(self):				return str(self)
+	def __str__(self):				return "<%s stream=%d offset=%d>" % (self.__class__.__name__, self.objstreamid, self.objstreamoffset)
+
 class IndirectObject(PDFBase):
 	"""
 	This object represents an indirect object reference (e.g., "12 0 R" for object id (objid) 12 and generation 0).
@@ -134,19 +194,37 @@ class IndirectObject(PDFBase):
 	def __repr__(self):				return str(self)
 	def __str__(self):				return "<%s (%d %d R)>" % (self.__class__.__name__, self.objid, self.generation)
 
-class XRefMapEntry(PDFBase):
-	"""
-	An instance of an xref row that includes an object id (objid), generation, and inuse flag.
-	An xref section includes multiple of this.
-	"""
+class XRefRowFree:
+	def __init__(self, objid, generation):
+		self.objid = objid
+		self.gen = generation
 
-	objid = None
-	offset = None
-	generation = None
-	inuse = None # Represented as 'n' or 'f' in the PDF but interpreted as True and False in python
+	def __repr__(self):
+		return str(self)
+	def __str__(self):
+		return "<XRefRowFree objid=(%d,%d)>" % (self.objid,self.gen)
 
-	def __repr__(self):				return str(self)
-	def __str__(self):				return "<%s (%d %d) -> %d inuse=%b>" % (self.__class__.__name__, self.objid, self.generation, self.offset, self.inuse)
+class XRefRowUsed:
+	def __init__(self, objid, offset, generation):
+		self.objid = objid
+		self.generation = generation
+		self.offset = offset
+
+	def __repr__(self):
+		return str(self)
+	def __str__(self):
+		return "<XRefRowUsed objid=(%d,%d) offset=%d>" % (self.objid,self.generation, self.offset)
+
+class XRefRowCompressed:
+	def __init__(self, objid, objstreamid, objstreamoffset):
+		self.objid = objid
+		self.objstreamid = objstreamid
+		self.objstreamoffset = objstreamoffset
+
+	def __repr__(self):
+		return str(self)
+	def __str__(self):
+		return "<XRefRowCompressed objid=%d stream=%d stream offset=%d>" % (self.objid, self.objstreamid, self.objstreamoffset)
 
 # ------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
@@ -300,6 +378,11 @@ class PDFHigherBase(PDFBase):
 		# 4) k is a valid property name and was not provided in the file
 		# 5) k is not a valid property name
 
+		# Already present, just return it
+		if k in self.__dict__:
+			return self.__dict__[k]
+
+
 		kk = '_' + k
 
 		# Handle (5)
@@ -325,6 +408,9 @@ class PDFHigherBase(PDFBase):
 
 		# Handle (1)
 		return self.__dict__[k]
+
+	def __setattr__(self, k,v):
+		self.__dict__[k] = v
 
 	def _Load(self, key, rawvalue):
 		raise NotImplementedError("Class %s does not implement _Load function to dynamically load properties" % self.__class__.__name__)
@@ -494,6 +580,72 @@ class NumberTreeNode(PDFHigherBase):
 			return self.Nums
 
 		return ret
+
+class XRefStream(PDFStreamBase):
+	prev = None
+	next = None
+
+	def get_trailer(self): return None
+	trailer = property(get_trailer)
+
+	def get_W(self):
+		return self.Dict['W']
+	W = property(get_W)
+
+	def get_Index(self):
+		return self.Dict['Index']
+	Index = property(get_Index)
+
+	def get_StreamRows(self):
+		if '_StreamRows' in self.__dict__:
+			return self.__dict__['_StreamRows']
+
+
+		# Copy these locally
+		rowsize = sum(self.W)
+		objidstart = self.Index[0]
+		size = self.Index[1]
+
+		if rowsize*size != len(self.Stream):
+			raise ValueError("Xref stream row size=%d with %d rows should be %d bytes but stream is %d bytes: should be equal" % (rowsize, size, rowsize*size, len(self.Stream)))
+
+		buf = bytes(self.Stream, 'latin-1')
+		entries = []
+
+		def unpack(bs):
+			return sum([bs[i]*(256**(len(bs)-i-1)) for i in range(len(bs))])
+
+		def getbytes(cnt, _offset):
+			return unpack( struct.unpack_from("B" * cnt, buf, _offset) )
+
+		ret = []
+
+		cnt = 0
+		off = 0
+		while cnt < size:
+			f1 = getbytes(self.W[0], off)
+			f2 = getbytes(self.W[1], off + self.W[0])
+			f3 = getbytes(self.W[2], off + self.W[0] + self.W[1])
+			oid = cnt+objidstart
+
+			if f1 == 0:			ret.append( XRefRowFree(oid, f2) )
+			elif f1 == 1:		ret.append( XRefRowUsed(oid, f2,f3) )
+			elif f1 == 2:		ret.append( XRefRowCompressed(oid, f2,f3) )
+			else:
+				raise ValueError("Unrecognized xref stream row type: %d" % f1)
+
+			# Skip to next entry
+			off += rowsize
+			cnt += 1
+
+		self.__dict__['_StreamRows'] = ret
+		return ret
+	StreamRows = property(get_StreamRows)
+
+class ObjectStream(PDFStreamBase):
+	def GetObjectTokens(self, offset):
+		# This is an instance of parser.ObjectStreamTokenizer
+		return self._Processor.GetObjectTokens(offset)
 
 class Content(PDFStreamBase):
 	pass
@@ -699,9 +851,6 @@ class XObject(PDFHigherBase,PDFStreamBase):
 			return PDFStreamBase.__getattr__(self, k)
 		else:
 			return PDFHigherBase.__getattr__(self, k)
-
-
-
 
 class XObjectForm(XObject):
 	# Table 4.45 (pg 358-60) of 1.7 spec

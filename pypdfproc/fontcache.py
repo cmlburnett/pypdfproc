@@ -8,6 +8,9 @@ from . import encodingmap as _encodingmap
 from . import pdf as _pdf
 from .glyph import Glyph
 
+from .cmap_identity_h import CMapIdentityH
+from .cmap_identity_v import CMapIdentityV
+
 class FontCache:
 	"""
 	Font cache for various font information to speed-up glyph lookups.
@@ -49,7 +52,7 @@ class FontCache:
 
 		# Get font from PDF or cache
 		if oid not in self.font_map:
-			f = self.pdf.p.GetObject(oid[0], oid[1])
+			f = self.pdf.p.GetFont(oid)
 			self.font_map[oid] = f
 			self.glyph_map[oid] = {}
 		else:
@@ -101,7 +104,6 @@ class FontCache:
 			raise ValueError("Unable to find character code %d ('%s') in encoding map for encoding %s" % (cid, chr(cid), f.Encoding))
 		if cid - f.FirstChar > len(f.Widths):
 			raise KeyError("Character code (%d) from the first character (%d) exceeds the widths array (len=%d)" % (cid, f.FirstChar, len(f.Widths)))
-
 
 		# Character code to glyph name to unicode
 		gname = encmap[cid]
@@ -240,20 +242,25 @@ class Type0FontCache:
 		# Get CMap and build mapper if not already cached
 		cmap = self.font.ToUnicode
 		if cmap == None:
-			print(['f', self.font.getsetprops()])
+			if self.font.Encoding == 'Identity-H':
+				cmap = CMapIdentityH()
+			elif self.f.Encoding == 'Identity-V':
+				cmap = CMapIdentityV()
+			else:
+				for subf in self.font.DescendantFonts:
+					print(['subf', subf.getsetprops()])
+					print(['subf desc', subf.FontDescriptor.getsetprops()])
 
-			for subf in self.font.DescendantFonts:
-				print(['subf', subf.getsetprops()])
-				print(['subf desc', subf.FontDescriptor.getsetprops()])
+					ff3 = subf.FontDescriptor.FontFile3
 
-				ff3 = subf.FontDescriptor.FontFile3
-
-				print(['fontfile3', ff3])
-				t = parser.CFFTokenizer(ff3.Stream)
-				t.Parse()
-				t.DumpBinary()
-				print(t.tzdat['unpacker']['Top Dict INDEX'])
-				raise NotImplementedError()
+					print(['fontfile3', ff3])
+					t = parser.CFFTokenizer(ff3.Stream)
+					t.Parse()
+					t.DumpBinary()
+					print(t.tzdat['Top DICT INDEX'])
+					print(t.tzdat['CharStrings INDEX'])
+					print(t.tzdat['Charset'])
+					raise NotImplementedError()
 
 
 		if not cmap.CMapper:
