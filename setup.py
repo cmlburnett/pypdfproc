@@ -40,10 +40,16 @@ data_files = [
 	('pypdfproc', [
 							'pypdfproc/__init__.py',
 							'pypdfproc/encodingmap.py',
+							'pypdfproc/fontcache.py',
+							'pypdfproc/fontmetrics.py',
+							'pypdfproc/glyph.py',
+							'pypdfproc/pdf.py',
 	]),
 	('pypdfproc/parser', [
 							'pypdfproc/parser/__init__.py',
+							'pypdfproc/parser/cff.py',
 							'pypdfproc/parser/cmap.py',
+							'pypdfproc/parser/fontmetrics.py',
 							'pypdfproc/parser/pdf.py',
 							'pypdfproc/parser/state.py',
 							'pypdfproc/parser/text.py',
