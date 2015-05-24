@@ -64,6 +64,8 @@ class FontCache:
 			g = self.GetGlyph_Type0(f, cid)
 
 		elif type(f.Encoding) == str:
+			# NB: unused for WinAnsiEncoding map to bullet
+			# which means g.cid != cid since the glyph returned is that of the bullet with proper cid set
 			g = self.GetGlyph_Enc_str(f, cid)
 
 		elif isinstance(f.Encoding, _pdf.FontEncoding):
@@ -73,6 +75,7 @@ class FontCache:
 			raise TypeError("Unrecognized font encoding type: '%s'" % f.Encoding)
 
 		# Cache glyph
+		# NB: do not change this to use g.cid instead of cid (see note above about WinAnsiEncoding and bullet)
 		self.glyph_map[oid][cid] = g
 
 		return g
@@ -98,6 +101,16 @@ class FontCache:
 		"""
 
 		encmap = _encodingmap.MapCIDToGlyphName(f.Encoding)
+
+		# Footnote 3 in Appendix D:
+		# "3. In WinAnsiEncoding, all unused codes greater than 40 map to the bullet character. However, only code 225 is specifically assigned to the bullet character; other codes are subject to future reassignment."
+		# I interpret this as 40 in octal (32 decimal)
+		#
+		# Such a lovely and ridiculous exception to use a bullet for everything not encoded, no?
+		if cid not in encmap and f.Encoding == 'WinAnsiEncoding' and cid > int('40', 8):
+			# Assigned CID of /bullet is 225 in octal (149 decimal)
+			# So just remap
+			cid = int('225', 8)
 
 		# Bounds checking since these error strings are more descriptive than KeyErrors
 		if cid not in encmap:
