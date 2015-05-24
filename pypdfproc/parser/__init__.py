@@ -258,7 +258,7 @@ class PDFTokenizer:
 			line = line.decode('latin-1').rstrip()
 			#print(['line', line])
 
-			if line == "trailer":
+			if line.startswith("trailer"):
 				self.file.seek(preoffset)
 				break
 
