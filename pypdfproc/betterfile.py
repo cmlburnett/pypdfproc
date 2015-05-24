@@ -116,7 +116,7 @@ class betterfile:
 				# Just LF
 				else:
 					# Un-read the @ss character
-					self.seek(1, SEEK_CUR)
+					self.seek(1, os.SEEK_CUR)
 
 					if not len(line): line = bytearray('\n', 'latin-1')
 					return line
