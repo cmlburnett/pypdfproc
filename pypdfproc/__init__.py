@@ -361,7 +361,7 @@ class PDF:
 			elif tok.type == 'n':		pass
 			elif tok.type == 're':		s.S.do_re(*[v.value for v in tok.value])
 			elif tok.type == 'W':		pass
-			elif tok.type == 'W*':		pass
+			elif tok.type == 'Wstar':	pass
 
 			elif tok.type == 'Do':		pass # Paint Xobject named by tok.value[0].value
 
