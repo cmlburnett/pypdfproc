@@ -264,7 +264,8 @@ class PDFToken(object):
 		return [PDFToken(t.type, t.value, t.lineno, t.lexpos) for t in tok]
 
 	def __str__(self):
-		return "PDFToken(%s,%r,%d,%d)" % (self.type, self.value, self.lineno, self.lexpos)
+		#return "PDFToken(%s,%r,%d,%d)" % (self.type, self.value, self.lineno, self.lexpos)
+		return "{%s,%r}" % (self.type, self.value)
 	def __repr__(self):
 		return str(self)
 
