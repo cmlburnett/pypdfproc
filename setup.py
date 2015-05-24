@@ -34,6 +34,7 @@ url = "http://www.candysporks.org"
 cp_license = "BSD"
 packages = [
 	"pypdfproc",
+	"pypdfproc.decoder",
 	"pypdfproc.parser",
 ]
 package_data = {'pypdfproc': ['StandardFonts_AFM.zip']}
@@ -45,6 +46,10 @@ data_files = [
 							'pypdfproc/fontmetrics.py',
 							'pypdfproc/glyph.py',
 							'pypdfproc/pdf.py',
+	]),
+	('pypdfproc/decoder', [
+							'pypdfproc/decoder/__init__.py',
+							'pypdfproc/decoder/flate.py',
 	]),
 	('pypdfproc/parser', [
 							'pypdfproc/parser/__init__.py',

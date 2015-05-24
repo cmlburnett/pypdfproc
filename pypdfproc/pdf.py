@@ -3,7 +3,11 @@ PDF classes that represent Carousel object information but in python form.
 No references to underlying parsing is made.
 """
 
+# System libs
 import struct, zlib
+
+# Local files
+from .decoder import Decoder
 
 class PDF:
 	"""
@@ -448,8 +452,14 @@ class PDFStreamBase(PDFBase):
 		if k == 'Stream':
 			if 'Filter' in self.Dict:
 				if self.Dict['Filter'] == 'FlateDecode':
+					if 'DecodeParms' in self.Dict:
+						parms = self.Dict['DecodeParms']
+					else:
+						# Assume no predictor
+						parms = {'Predictor': 0}
+
 					dat = bytes(self.StreamRaw, 'latin-1')
-					s = zlib.decompress(dat)
+					s = Decoder.Flate(dat, parms)
 
 					self.__dict__['Stream'] = s.decode('latin-1')
 				else:
