@@ -6,14 +6,23 @@ from itertools import product as ITERproduct
 import zlib
 
 def FlateDecode(data, parms):
-	uncomp = zlib.decompress(data)
-	#print(['data', data])
-	#print(['uncomp', uncomp])
-	#print(['parms', parms])
+	"""
+	FlateDecode is primarily based around zlib compression.
+	However, predictors can be used to make the data more uniform prior to compression
+	and so this must be undone.
+	Unfortunately, zlib does not handle this stuff since it is out of its scope.
+	"""
 
+	# Decompress data before un-doing the predictor
+	uncomp = zlib.decompress(data)
+
+	# Determine predictor (required parameter, even though it's optional in PDF spec)
+	if 'Predictor' not in parms:
+		raise KeyError("Expected 'Predictor' key in parameters. Required in this implementation. HINT: {'Predictor': 0} is acceptable argument if, indeed, no predictor is used.")
 	pred = parms['Predictor']
 
 	if pred == 0:
+		# No predictor, nothing to do so just return decompressed data
 		return uncomp
 	elif pred == 2:			raise NotImplementedError("TIFF predictor 2 not implemented yet")
 	elif pred == 10:		raise NotImplementedError("PNG None predictor (10) not implemented yet")
