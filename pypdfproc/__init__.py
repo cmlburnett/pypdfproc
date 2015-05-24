@@ -173,6 +173,14 @@ class PDF:
 					if cid >= f.FirstChar and cid <= f.LastChar:
 						by_cid[cid] = w['W'][0]
 
+				# Must add in missing CID's as zeros
+				cids = list(by_cid.keys())
+				cids.sort()
+				for i in range(mincid, maxcid+1):
+					if i not in cids:
+						by_cid[i] = 0
+
+				# Resort and form contiguous widths array
 				cids = list(by_cid.keys())
 				cids.sort()
 				f.Widths = [by_cid[cid] for cid in cids]
