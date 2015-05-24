@@ -15,6 +15,7 @@ from . import pdf as _pdf
 from .fontcache import FontCache, CIDWidthArrayToMap
 from .fontmetrics import FontMetricsManager
 from .stdfonts import StandardFonts
+from .betterfile import betterfile
 
 STANDARD_FONT_AFM_ZIP = "StandardFonts_AFM.zip"
 
@@ -52,11 +53,11 @@ class PDF:
 		self.fname = fname
 
 		# Open file and mmap it (binary is important here so that python does not interpret the file as text)
-		self.f = open(fname, 'rb')
+		self.f = betterfile.open(fname, 'rb')
 		self.m = mmap.mmap(self.f.fileno(), 0, prot=mmap.PROT_READ)
 
 		# Open the file and initialize it (xref/trailer reading)
-		self.p = parser.PDFTokenizer(self.m)
+		self.p = parser.PDFTokenizer(self.f)
 		self.p.Initialize()
 
 		self.fonts = FontCache(self)

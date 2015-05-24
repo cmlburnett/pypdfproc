@@ -16,70 +16,6 @@ __all__ = ['PDFTokenizer', 'TextTokenizer', 'CMapTokenizer', 'CFFTokenizer', 'Ob
 # --------------------------------------------------------------------------------------------------------
 # --------------------------------------------------------------------------------------------------------
 
-def gotoend(f):
-	"""
-	Helper function that jumps to lass byte in the file.
-	"""
-
-	f.seek(-1, os.SEEK_END)
-
-def readlinerev(f, n=1):
-	"""
-	Helper function that reads @n lines in reverse.
-	"""
-
-	if n == 1:
-		return _readlinerev(f)
-
-	lines = []
-	for i in range(n):
-		lines.append(_readlinerev(f))
-	return lines
-
-def _readlinerev(f):
-	"""
-	Helper function that reads a single line in reverse.
-	"""
-
-	# Stop at start of file
-	ofs = f.tell()
-	if ofs == 0:
-		return None
-
-	# Iterate until EOL is found
-	startidx = ofs
-	endidx = ofs
-	while ofs >= 0:
-		# Get current character
-		c = f[ofs]
-
-		# Found EOL, check if CRLF or just LF or Just CR
-		if c == ord('\r'):
-			startidx = ofs
-			f.seek(-1, os.SEEK_CUR) # CR
-
-			buf = f[startidx+1:endidx+1]
-			return buf
-
-		elif c == ord('\n'):
-			startidx = ofs
-
-			if f[ofs-1] == ord('\r'):
-				f.seek(-2, os.SEEK_CUR) # CRLF
-			else:
-				f.seek(-1, os.SEEK_CUR) # LF
-
-			buf = f[startidx+1:endidx+1]
-			return buf
-
-		if ofs == 0:
-			break
-
-		f.seek(-1, os.SEEK_CUR)
-		ofs = f.tell()
-
-	return f[0:endidx]
-
 def cuttokens(toks, starttok, endtok):
 	start,end = None,None
 
@@ -143,13 +79,13 @@ class PDFTokenizer:
 
 
 		# Read trailer at end of file
-		gotoend(self.file)
+		self.file.gotoend()
 
 		# Iterate backward until first "xref" is found, which is followed by the end trailer
 		lines = []
 		while True:
-			l = readlinerev(self.file)
-			if l == None:
+			l = self.file.readlinerev()
+			if len(l) == 0:
 				print(lines)
 				raise Exception("Unable to finish reading backward to find xref: offset=%d" % self.file.tell())
 
