@@ -106,7 +106,7 @@ class betterfile:
 
 			# LF or CRLF
 			if s == b'\n':
-				ss = self.readrev(1)
+				ss = self.readrev()
 
 				# CRLF
 				if ss == b'\r':
