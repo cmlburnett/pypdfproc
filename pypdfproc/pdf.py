@@ -448,7 +448,9 @@ class PDFStreamBase(PDFBase):
 		if k == 'Stream':
 			if 'Filter' in self.Dict:
 				if self.Dict['Filter'] == 'FlateDecode':
-					s = zlib.decompress(bytes(self.StreamRaw, 'latin-1'))
+					dat = bytes(self.StreamRaw, 'latin-1')
+					s = zlib.decompress(dat)
+
 					self.__dict__['Stream'] = s.decode('latin-1')
 				else:
 					raise ValueError("Unknown filter for content stream: %s" % self.Dict['Filter'])
