@@ -618,8 +618,8 @@ class XRefStream(PDFStreamBase):
 		objidstart = self.Index[0]
 		size = self.Index[1]
 
-		if rowsize*size != len(self.Stream):
-			raise ValueError("Xref stream row size=%d with %d rows should be %d bytes but stream is %d bytes: should be equal" % (rowsize, size, rowsize*size, len(self.Stream)))
+		if rowsize*size > len(self.Stream):
+			raise ValueError("Xref stream row size=%d with %d rows should be greater than %d bytes but stream is %d bytes" % (rowsize, size, rowsize*size, len(self.Stream)))
 
 		buf = bytes(self.Stream, 'latin-1')
 		entries = []
