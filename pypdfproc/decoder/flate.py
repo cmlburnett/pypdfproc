@@ -63,6 +63,11 @@ def PNG_Up(data, parms):
 	 2  5  0  1
 
 	This complicates the indexing.
+
+	Implementation help from https://forums.adobe.com/thread/664902
+	 "Dealing with Predictors when decoding PDFs"
+	 =VA=FyreHeart
+	 Jun 21, 2010 1:55 PM
 	"""
 
 	if 'Columns' not in parms:
