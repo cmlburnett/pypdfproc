@@ -24,6 +24,7 @@ tokens = (
 
 	'true',
 	'false',
+	'NULL',
 
 	'obj',
 	'endobj',
@@ -47,6 +48,7 @@ t_LIT_END =		r'\)'
 # Literal strings to match
 t_true =		r'true'
 t_false =		r'false'
+t_NULL =		r'null'
 
 t_obj =			r'obj'
 t_endobj =		r'endobj'
