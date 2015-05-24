@@ -22,7 +22,7 @@ def FlateDecode(data, parms):
 	elif pred == 13:		raise NotImplementedError("PNG Avg predictor (13) not implemented yet")
 	elif pred == 14:		raise NotImplementedError("PNG Paeth predictor (14) not implemented yet")
 	elif pred == 15:		raise NotImplementedError("PNG Optimum predictor (15) not implemented yet")
-	
+
 	else:
 		raise NotImplementedError("Flate predictor %d unknonw and cannot be implemented" % pred)
 

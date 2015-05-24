@@ -605,13 +605,15 @@ class XRefStream(PDFStreamBase):
 	W = property(get_W)
 
 	def get_Index(self):
-		return self.Dict['Index']
+		if 'Index' in self.Dict:
+			return self.Dict['Index']
+		else:
+			return [0, self.Dict['Size']]
 	Index = property(get_Index)
 
 	def get_StreamRows(self):
 		if '_StreamRows' in self.__dict__:
 			return self.__dict__['_StreamRows']
-
 
 		# Copy these locally
 		rowsize = sum(self.W)
