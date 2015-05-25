@@ -493,6 +493,9 @@ class PDFTokenizer:
 	def GetContent(self, ind):
 		return self.GetObject(ind, self._ParseContent)
 
+	def GetContentOrArray(self, ind):
+		return self.GetObject(ind, self._ParseContentOrArray)
+
 	def GetResource(self, ind):
 		return self.GetObject(ind, self._ParseResource)
 
@@ -584,6 +587,14 @@ class PDFTokenizer:
 
 	def _ParseContent(self, objidgen, tokens):
 		return self._ParseStream(objidgen, tokens)
+
+	def _ParseContentOrArray(self, objidgen, tokens):
+
+		print(['tokens[0]', tokens[0].value[2][0]])
+		if tokens[0].value[2][0].type == 'ARR':
+			return self._ParseArray(objidgen, tokens)
+		else:
+			return self._ParseContent(objidgen, tokens)
 
 	def _ParsePageTreeNodeOrPageOject(self, objidgen, tokens):
 		"""
@@ -764,7 +775,7 @@ class PDFTokenizer:
 						ret.append( self.GetContent(v) )
 					return ret
 				elif isinstance(value, _pdf.IndirectObject):
-					return self.GetContent(value)
+					return self.GetContentOrArray(value)
 				else:
 					raise TypeError("Unrecognized type for Page.Contents: %s" % type(value))
 			elif key == 'Resources':

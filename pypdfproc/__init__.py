@@ -7,7 +7,7 @@ __version__ = "1.0.0"
 __all__ = ['parser']
 
 # System libs
-import mmap, os
+import mmap, os, sys, traceback
 
 # Local files
 from . import parser
@@ -273,8 +273,14 @@ class PDF:
 		tt = parser.TextTokenizer(self.f, self.p)
 
 		cts = page.Contents
-		if type(cts) == list:
-			ct = " ".join([ct.Stream for ct in cts])
+		if type(cts) == list or type(cts) == _pdf.Array:
+			ct = []
+			for c in cts:
+				if isindirect(c):
+					ct.append(self.p.GetContent(c))
+				else:
+					pass
+			ct = " ".join([c.Stream for c in ct])
 		else:
 			ct = cts.Stream
 		#print(ct)
