@@ -258,7 +258,14 @@ class PDF:
 		callback(None, 'render pages start', None)
 
 		for page in pages:
-			self.RenderPage(page, callback)
+			try:
+				self.RenderPage(page, callback)
+			except:
+				# Return is whether or not to stop rendering on exception
+				ret = callback(None, 'page exception', None)
+				if ret:
+					# Quit by re-raising exception
+					raise
 
 		callback(None, 'render pages end', None)
 
@@ -470,7 +477,11 @@ class PDF:
 
 		# Callback function that si appropriate to handle generation of a fulltext transcript of the document
 		def cb(s, action, page, *args):
-			if action == 'change font':
+			if action == 'page exception':
+				# Keep going and do nothing about the exception
+				traceback.print_exc()
+				return False
+			elif action == 'change font':
 				Tf = args[0]
 				Tfs = args[1]
 
