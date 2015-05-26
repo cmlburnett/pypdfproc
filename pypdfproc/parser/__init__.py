@@ -590,7 +590,6 @@ class PDFTokenizer:
 
 	def _ParseContentOrArray(self, objidgen, tokens):
 
-		print(['tokens[0]', tokens[0].value[2][0]])
 		if tokens[0].value[2][0].type == 'ARR':
 			return self._ParseArray(objidgen, tokens)
 		else:
