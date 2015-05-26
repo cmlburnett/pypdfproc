@@ -558,8 +558,12 @@ class PDFTokenizer:
 		return d[0]
 
 	def _ParseArray(self, objidgen, tokens):
-		a = TokenHelpers.Convert(tokens[0].value[2])
-		return a[0]
+		if tokens[0].type == 'ARR':
+			return tokens[0]
+		elif tokens[0].type == 'OBJECT':
+			return TokenHelpers.Convert(tokens[0].value[2][0])
+		else:
+			raise TypeError("Unrecognized type for array parsing: '%s'" % tokens[0])
 
 	def _ParseInt(self, objidgen, tokens):
 		# Example
