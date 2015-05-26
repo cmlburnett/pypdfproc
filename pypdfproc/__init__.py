@@ -278,8 +278,10 @@ class PDF:
 			for c in cts:
 				if isindirect(c):
 					ct.append(self.p.GetContent(c))
+				elif isinstance(c, _pdf.Content):
+					ct.append(c)
 				else:
-					pass
+					raise TypeError("Unexpected type for content array: '%s'" % c)
 			ct = " ".join([c.Stream for c in ct])
 		else:
 			ct = cts.Stream
