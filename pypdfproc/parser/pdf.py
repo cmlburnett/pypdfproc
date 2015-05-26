@@ -250,6 +250,7 @@ class ConsolidateTokensClass:
 			# index of first 3-tuple of xref data
 			firstxref = startpos+3
 
+			i = firstxref
 			objs = []
 			cnt = 0
 			for i in range(firstxref, firstxref + numobjs*3, 3):
