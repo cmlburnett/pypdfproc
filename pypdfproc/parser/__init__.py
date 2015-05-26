@@ -816,13 +816,8 @@ class PDFTokenizer:
 				elif key == 'DescendantFonts':
 					arr = self.GetArray(value)
 					r = []
-					for a in arr.value:
-						# Convert indirect LexToken into _pdf.IndirectObject
-						_ = _pdf.IndirectObject()
-						_.objid = a.value[0]
-						_.generation = a.value[1]
-
-						r.append( self.GetFont(_) )
+					for a in arr:
+						r.append( self.GetFont(a) )
 					return r
 
 				else:
