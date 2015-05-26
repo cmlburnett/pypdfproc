@@ -298,10 +298,22 @@ def TokenizeString(txt, residual=None):
 			startpos = lexer.lexpos
 
 			while cnt>0:
-				if lexer.lexdata[lexer.lexpos] == '(' and lexer.lexdata[lexer.lexpos-1] != '\\':
-					cnt += 1
-				elif lexer.lexdata[lexer.lexpos] == ')' and lexer.lexdata[lexer.lexpos-1] != '\\':
-					cnt -= 1
+				c = lexer.lexdata[lexer.lexpos]
+				if c in ('(', ')'):
+					backcnt = 0
+					for i in range(lexer.lexpos-1, -1, -1):
+						if lexer.lexdata[i] == '\\':
+							backcnt += 1
+						else:
+							break
+					if backcnt % 2 == 0:
+						if c == '(':		cnt += 1
+						elif c == ')':		cnt -= 1
+						else:
+							raise ValueError("Should not reach this point: expected ( or ), got '%s' at position" % (c, lexer.lexpos))
+					else:
+						# paren is escaped
+						pass
 
 				# Make a step
 				lexer.lexpos += 1
