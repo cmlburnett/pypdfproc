@@ -572,8 +572,12 @@ def SplitLiteral(lit):
 	i = 0
 	while i < imax:
 		if lit[i] == '\\':
+			if lit[i+1] == '\\':
+				ret.append(lit[i])
+				i += 2
+
 			# Ignore the backslash (I think this is the correct interpretation
-			if lit[i+1] in ('\n', '\r', '\t', '\b', '\f'):
+			elif lit[i+1] in ('\n', '\r', '\t', '\b', '\f'):
 				ret.append(lit[i+1])
 				i += 2
 
