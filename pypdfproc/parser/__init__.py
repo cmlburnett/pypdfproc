@@ -813,6 +813,18 @@ class PDFTokenizer:
 					return self.GetFontEncoding(value)
 				elif key == 'ToUnicode':
 					return self.GetFontToUnicode(value)
+				elif key == 'DescendantFonts':
+					arr = self.GetArray(value)
+					r = []
+					for a in arr.value:
+						# Convert indirect LexToken into _pdf.IndirectObject
+						_ = _pdf.IndirectObject()
+						_.objid = a.value[0]
+						_.generation = a.value[1]
+
+						r.append( self.GetFont(_) )
+					return r
+
 				else:
 					pass
 			else:
