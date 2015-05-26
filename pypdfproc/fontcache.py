@@ -280,7 +280,16 @@ class Type0FontCache:
 			cmap.CMapper = parser.CMapTokenizer().BuildMapper(cmap.Stream)
 
 		# Map CID
-		u = cmap.CMapper(cid)
+		try:
+			u = cmap.CMapper(cid)
+		except KeyError as e:
+			# Try backup cmap based on encoding
+			if self.font.Encoding == 'Identity-H':
+				u = CMapIdentityH().CMapper(cid)
+			elif self.f.Encoding == 'Identity-V':
+				u = CMapIdentityV().CMapper(cid)
+			else:
+				raise
 
 		# Create glyph information
 		g = Glyph(cid)
