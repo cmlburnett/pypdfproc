@@ -7,6 +7,7 @@ from . import parser
 from . import encodingmap as _encodingmap
 from . import pdf as _pdf
 from .glyph import Glyph
+from .parser import CFFTokenizer
 
 from .cmap_identity_h import CMapIdentityH
 from .cmap_identity_v import CMapIdentityV
@@ -195,10 +196,14 @@ class FontCache:
 		This is a common method to search harder for the glyph.
 		"""
 
+		fd = f.FontDescriptor
+		cmap = f.ToUnicode
+		enc = f.Encoding
+
 		# Try the cmap
 		if f.ToUnicode:
 			try:
-				return f.ToUnicode.CMapper(cid)
+				return cmap.CMapper(cid)
 			except KeyError:
 				# Not there, try again
 				pass
@@ -213,13 +218,116 @@ class FontCache:
 			if f.BaseFont.endswith('AdvPSSym'):
 				if gname == 'C211':		return '\u00A9' # Copyright
 
-		print(['f', f.getsetprops()])
-		print(['enc', f.Encoding.getsetprops()])
-		print(['cmap', f.ToUnicode])
-		print(['encmap', encmap])
-		print(['gname', gname])
+		#print(['cid', cid])
+		#print(['f', f.getsetprops()])
+		#print(['fd', fd.getsetprops()])
+		#print(['enc', f.Encoding.getsetprops()])
+		#print(['cmap', cmap])
+		#print(['encmap', encmap])
+		#print(['gname', gname])
 
-		raise NotImplementedError()
+		ff = fd.FontFile3
+		#print(['ff3', ff.Dict])
+
+		cfft = CFFTokenizer(ff.Stream)
+		cfft.Parse()
+
+		gmatch = None
+		for g in cfft.tzdat['Glyphs'][0]:
+			if g['cname'] == gname:
+				gmatch = g
+				break
+
+		#print(['gmatch', gmatch])
+		if gmatch:
+			gcid = gmatch['cid']
+			if f.BaseFont != None and f.BaseFont.endswith('MathematicalPi-One'):
+				if gcid == ord('A'):	return '\u0391' # Capital Alpha
+				elif gcid == ord('B'):	return '\u0392' # Capital Beta
+				elif gcid == ord('C'):	return '\u03A8' # Capital Psi
+				elif gcid == ord('D'):	return '\u0394' # Capital Delta
+				elif gcid == ord('E'):	return '\u0395' # Capital Epsilon
+				elif gcid == ord('F'):	return '\u03A6' # Capital Phi
+				elif gcid == ord('G'):	return '\u0393' # Capital Gamma
+				elif gcid == ord('H'):	return '\u0397' # Capital Eta
+				elif gcid == ord('I'):	return '\u0399' # Capital Iota
+				elif gcid == ord('J'):	return '\u039E' # Capital Xi
+				elif gcid == ord('K'):	return '\u039A' # Capital Kappa
+				elif gcid == ord('L'):	return '\u039B' # Capital Lambda
+				elif gcid == ord('M'):	return '\u039C' # Capital Mu
+				elif gcid == ord('N'):	return '\u039D' # Capital Nu
+				elif gcid == ord('O'):	return '\u039F' # Capital Omicron
+				elif gcid == ord('P'):	return '\u03A0' # Capital Pi
+				elif gcid == ord('Q'):	return '\u03F4' # Capital Theta symbol (script)
+				elif gcid == ord('R'):	return '\u03A1' # Capital Rho
+				elif gcid == ord('S'):	return '\u03A3' # Capital Sigma
+				elif gcid == ord('T'):	return '\u03A4' # Capital Tau
+				elif gcid == ord('U'):	return '\u0398' # Capital Theta
+				elif gcid == ord('V'):	return '\u03A9' # Capital Omega
+				elif gcid == ord('W'):	return '\u03D0' # Capital Beta symbol
+				elif gcid == ord('X'):	return '\u03A7' # Capital Chi
+				elif gcid == ord('Y'):	return '\u03A5' # Capital Upsilon
+				elif gcid == ord('Z'):	return '\u0396' # Capital Zeta
+				elif gcid == ord('a'):	return '\u03B1' # Small Alpha
+				elif gcid == ord('b'):	return '\u03B2' # Small Beta
+				elif gcid == ord('c'):	return '\u03C8' # Small Psi
+				elif gcid == ord('d'):	return '\u03B4' # Small Delta
+				elif gcid == ord('e'):	return '\u03B5' # Small Epsilon
+				elif gcid == ord('f'):	return '\u03C6' # Small Phi
+				elif gcid == ord('g'):	return '\u03B3' # Small Gamma
+				elif gcid == ord('h'):	return '\u03B7' # Small Eta
+				elif gcid == ord('i'):	return '\u03B9' # Small Iota
+				elif gcid == ord('j'):	return '\u03BE' # Small Xi
+				elif gcid == ord('k'):	return '\u03BA' # Small Kappa
+				elif gcid == ord('l'):	return '\u03BB' # Small Lambda
+				elif gcid == ord('m'):	return '\u03BC' # Small Mu
+				elif gcid == ord('n'):	return '\u03BD' # Small Nu
+				elif gcid == ord('o'):	return '\u03BF' # Small Omicron
+				elif gcid == ord('p'):	return '\u03C0' # Small Pi
+				elif gcid == ord('q'):	return '\u03D1' # Small Theta symbol (script)
+				elif gcid == ord('r'):	return '\u03C1' # Small Rho
+				elif gcid == ord('s'):	return '\u03C3' # Small Sigma
+				elif gcid == ord('t'):	return '\u03C4' # Small Tau
+				elif gcid == ord('u'):	return '\u03B8' # Small Theta
+				elif gcid == ord('v'):	return '\u03C9' # Small Omega
+				elif gcid == ord('w'):	return '\u03D5' # Small phi symbol (script)
+				elif gcid == ord('x'):	return '\u03C7' # Small Chi
+				elif gcid == ord('y'):	return '\u03C5' # Small Upsilon
+				elif gcid == ord('z'):	return '\u03B6' # Small Zeta
+				elif gcid == ord('0'):	return '\u2033' # Double prime
+				elif gcid == ord('1'):	return '\u0028' # Plus sign
+				elif gcid == ord('2'):	return '\u2212' # Minus sign
+				elif gcid == ord('3'):	return '\u00D7' # Multiplication sign
+				elif gcid == ord('4'):	return '\u00F7' # Division sign
+				elif gcid == ord('5'):	return '\u003D' # Equal sign
+				elif gcid == ord('6'):	return '\u00B1' # Plus-minus
+				elif gcid == ord('7'):	return '\u2213' # Minus-plus
+				elif gcid == ord('8'):	return '\u00B0' # Degree symbol
+				elif gcid == ord('9'):	return '\u2032' # Prime
+				elif gcid == ord('!'):	return '\u226A' # Much less-than
+				elif gcid == ord('@'):	return '\u226B' # Much greater-than
+				elif gcid == ord('#'):	return '\u2264' # Less-than or equal to
+				elif gcid == ord('$'):	return '\u2265' # Greater-than or equal to
+				elif gcid == ord('%'):	return '\u2266' # Less-than over equal to
+				elif gcid == ord('^'):	return '\u2267' # Greater-than over equal to
+				elif gcid == ord('&'):	return '\u2272' # Less-than or equivalent to
+				elif gcid == ord('*'):	return '\u2273' # Greater-than or equivalent to
+				#elif gcid == ord('('):	return '\u' # Looks like less-than or equivalent to, but the squiggle underneath is flipped
+				#elif gcid == ord(')'):	return '\u' # Looks like greater-than or equivalent to, but the squiggle underneath is angled more
+				elif gcid == ord('{'):	return '\u002D' # Hyphen-minus (I think this is hyphen)
+				elif gcid == ord('}'):	return '\u2014' # Em dash; (I think this is em)
+				elif gcid == ord('['):	return '\u2205' # Empty set
+				elif gcid == ord(']'):	return '\u2013' #  En dash; (I think this is en)
+				elif gcid == ord(':'):	return '\u2135' # Alef symbol
+				elif gcid == ord(';'):	return '\u2200' # For all
+				elif gcid == ord('?'):	return '\u2219' # Bullet operator
+				#elif gcid == ord('<'):	return '\u0' # Looks like less-than or equal to, but the bar is slanted
+				#elif gcid == ord('>'):	return '\u0' # Looks like greater-than or equal to, but the bar is slanted
+				elif gcid == ord('-'):	return '\u2034' # Triple prime
+				elif gcid == ord('+'):	return '\u2276' # Less-than or greater-than
+				elif gcid == ord('='):	return '\u2207' # Del operator/nabla
+
+		raise ValueError("Unable to find unicode for character ord=%d" % cid)
 
 class Type0FontCache:
 	"""
