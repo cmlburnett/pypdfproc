@@ -432,6 +432,7 @@ StandardStrings[388] = 'Regular'
 StandardStrings[389] = 'Roman'
 StandardStrings[390] = 'Semibold'
 NumStandardStrings = len(StandardStrings)
+MaxStandardStrings = max(StandardStrings)
 
 class _CFFUnpacker:
 	def __init__(self, txt):
@@ -700,6 +701,49 @@ class _CFFUnpacker:
 			glyphs = [self.GetSID() for i in range(nGlyphs-1)]
 
 			return {'format': fmt, 'nGlyphs': nGlyphs, 'glyph': glyphs}
+		elif fmt == 1:
+			# NB: not an efficient way to store this though
+
+			glyphs = []
+
+			# Have to load as many ranges as it takes to count to nGlyphs
+			# Minus one because of the implied .notdef glyph
+			remaining = nGlyphs - 1
+
+			while remaining > 0:
+				# Get first glyph SID in range
+				sid = self.GetSID()
+				glyphs.append(sid)
+				remaining -= 1
+
+				# This many are remaining and are sequential from sid
+				nLeft = self.Get8()
+				glyphs += [sid+i for i in range(1, nLeft+1)]
+				remaining -= nLeft
+
+			return {'format': fmt, 'nGlyphs': nGlyphs, 'glyph': glyphs}
+
+		elif fmt == 2:
+			# NB: not an efficient way to store this though
+
+			glpyhs = []
+
+			# Have to load as many ranges as it takes to count to nGlyphs
+			remaining = nGlyphs
+
+			while remaining > 0:
+				# Get first glyph SID in range
+				sid = self.GetSID()
+				glyphs.append(sid)
+				remaining -= 1
+
+				# This many are remaining and are sequential from sid
+				nLeft = self.Get16()
+				glyphs += [sid+i for i in range(1, nLeft+1)]
+				remaining -= nLeft
+
+			return {'format': fmt, 'nGlyphs': nGlyphs, 'glyph': glyphs}
+
 		else:
 			raise NotImplementedError("Format %d of charsets not implemented yet" % fmt)
 
@@ -756,16 +800,39 @@ def TokenizeString(txt):
 
 	charsets = []
 	charstrings_indexes = []
+	encodings = []
 	for fidx in range(len(fonts)):
 		# Read Encoding section if present in Top Dict
-		if 'Encoding' in fonts[0]:
-			raise NotImplementedError("Encoding handling not implemented yet")
+		if 'Encoding' in fonts[fidx]:
+			idx = fonts[fidx].index('Encoding')
+			encnum = fonts[fidx][idx-1]
+
+			if encnum == 0:
+				# Standard encoding
+				raise NotImplementedError("Don't know how to handle standard encoding yet")
+			elif encnum == 1:
+				# Expert encoding
+				raise NotImplementedError("Don't know how to handle expert encoding yet")
+			else:
+				pass
+
+			u.offset = encnum
+			off = u.offset
+
+			fmt = u.Get8()
+			if fmt == 0:
+				nCodes = u.Get8()
+				codes = [u.Get8() for i in range(nCodes)]
+				encoding = {'nCodes': nCodes, 'codes': codes}
+				encodings.append(encoding)
+			else:
+				raise NotImplementedError("Encoding format %d for font number %d is not implemented yet" % (fmt, fidx))
 
 		try:
 			# Find index for CharStrings...
-			idx = fonts[0].index('CharStrings')
+			idx = fonts[fidx].index('CharStrings')
 			# ...and the offset is the value prior to it in the list
-			u.offset = fonts[0][idx-1]
+			u.offset = fonts[fidx][idx-1]
 			off = u.offset
 
 			charstrings_index = u.GetIndex()
@@ -782,11 +849,18 @@ def TokenizeString(txt):
 			nGlyphs = charstrings_index['count']
 			# Read charsets section if present in Top Dict
 			try:
-				idx = fonts[0].index('charset')
-				offset = idx
+				idx = fonts[fidx].index('charset')
+				offset = fonts[fidx][idx-1]
 
-				charset = u.GetCharsets(idx, nGlyphs)
-				charset['_offset'] = offset
+				if offset == 0:
+					raise NotImplementedError("Charset not implemented for ISOAdobe")
+				elif offset == 1:
+					raise NotImplementedError("Charset not implemented for Expert")
+				elif offset == 2:
+					raise NotImplementedError("Charset not implemented for ExpertSubset")
+				else:
+					charset = u.GetCharsets(offset, nGlyphs)
+					charset['_offset'] = offset
 			except ValueError:
 				charset = None
 			charsets.append(charset)
@@ -805,8 +879,30 @@ def TokenizeString(txt):
 	ret['Top DICT INDEX'] = top_dict_index
 	ret['String INDEX'] = string_index
 	ret['Global Subr INDEX'] = global_subr_index
-	ret['Encoding'] = None
+	ret['Encoding'] = encodings
 	ret['CharStrings INDEX'] = charstrings_indexes
 	ret['Charset'] = charsets
+
+	ret['Glyphs'] = []
+	for idx in range(len(top_dict_index['fonts'])):
+		font = top_dict_index['fonts'][idx]
+		cstr = charstrings_indexes[idx]
+		cset = charsets[idx]
+		enc =  encodings[idx]
+
+		ret['Glyphs'].append([])
+		for i in range(cstr['count']-1):
+			g = {}
+			g['gid'] = i+1
+			g['cstr'] = cstr['data'][i+1]
+			g['cset'] = cset['glyph'][i]
+			g['cid'] = enc['codes'][i]
+
+			if g['cset'] > MaxStandardStrings:
+				g['cname'] = string_index['data'][ g['cset'] - MaxStandardStrings - 1 ].decode('latin-1')
+			else:
+				g['cname'] = StandardStrings[ g['cset'] ]
+
+			ret['Glyphs'][idx].append(g)
 	return ret
 
