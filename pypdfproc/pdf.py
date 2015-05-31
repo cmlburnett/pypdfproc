@@ -137,6 +137,9 @@ class PDFBase:
 	# Tuple of (object id, generation), None if no id for this object
 	oid = None
 
+	def __init__(self):
+		pass
+
 # ------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
 # Data types

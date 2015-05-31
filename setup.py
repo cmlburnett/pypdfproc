@@ -25,6 +25,7 @@ desc = "PDF processor"
 long_desc = "Processes and updates PDF files specifically for journal articles and references"
 classifiers = [
 	"Intended Audience :: Developers",
+	"Programming Language :: Python :: 2",
 	"Programming Language :: Python :: 3",
 	"Programming Language :: Python :: 3.3",
 ]
@@ -34,6 +35,7 @@ url = "http://www.candysporks.org"
 cp_license = "BSD"
 packages = [
 	"pypdfproc",
+	"pypdfproc.cli",
 	"pypdfproc.decoder",
 	"pypdfproc.parser",
 ]
@@ -46,6 +48,9 @@ data_files = [
 							'pypdfproc/fontmetrics.py',
 							'pypdfproc/glyph.py',
 							'pypdfproc/pdf.py',
+	]),
+	('pypdfproc/cli', [
+							'pypdfproc/cli/__init__.py',
 	]),
 	('pypdfproc/decoder', [
 							'pypdfproc/decoder/__init__.py',
@@ -63,7 +68,7 @@ data_files = [
 ]
 scripts = []
 
-required_python_version = '3.3'
+required_python_version = '2.7'
 
 ###############################################################################
 # end arguments for setup

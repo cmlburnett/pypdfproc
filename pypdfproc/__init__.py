@@ -4,13 +4,14 @@ PDF Processor
 
 __version__ = "1.0.0"
 
-__all__ = ['parser']
+__all__ = ['parser', 'PDF', '_pdf', 'cli']
 
 # System libs
 import mmap, os, sys, traceback
 
 # Local files
 from . import parser
+from . import cli
 from . import pdf as _pdf
 from .fontcache import FontCache, CIDWidthArrayToMap
 from .fontmetrics import FontMetricsManager
