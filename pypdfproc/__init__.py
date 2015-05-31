@@ -810,7 +810,7 @@ class PDFCmdState:
 		raise CmdError("File '%s' not found, cannot close it" % item)
 
 	def _pwd_item(self, item):
-		if type(item) == str:
+		if type(item) == str or type(item) == unicode:
 			return item
 		elif type(item) == tuple:
 			# Tuple format is (object, text to show)
@@ -818,7 +818,7 @@ class PDFCmdState:
 		elif isinstance(item, _pdf.PDFBase):
 			return str(item.__class__).split('.')[-1]
 		else:
-			raise TypeError("Unrecognized pwd stack type: '%s'" % item)
+			raise TypeError("Unrecognized pwd stack type: '%s' (type %s)" % (item, type(item)))
 
 	def pwd(self):
 		ret = []
@@ -834,6 +834,10 @@ class PDFCmdState:
 		if line == '' or line == '/':
 			self._pwd = []
 			return
+
+		# Strip trailing slash as it is unnecessary
+		if line.endswith('/'):
+			line = line[0:-1]
 
 		parts = line.split('/')
 		for part in parts:
