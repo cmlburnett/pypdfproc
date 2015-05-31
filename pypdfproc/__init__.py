@@ -11,7 +11,6 @@ import cmd, mmap, os, sys, traceback
 
 # Local files
 from . import parser
-from . import cli
 from . import pdf as _pdf
 from .fontcache import FontCache, CIDWidthArrayToMap
 from .fontmetrics import FontMetricsManager
@@ -704,7 +703,7 @@ def format_cols(dat, pre="  ", celldiv=" ", rowdiv="\n", post=""):
 def pdfbase_objects(obj):
 	dat = []
 
-	if isinstance(obj, pypdfproc._pdf.PDFHigherBase):
+	if isinstance(obj, _pdf.PDFHigherBase):
 		ps = obj.getsetprops()
 		for k,v in ps.items():
 			if k == '_Loader': continue
@@ -714,12 +713,12 @@ def pdfbase_objects(obj):
 
 			dat.append( (k[1:],) )
 
-	elif isinstance(obj, pypdfproc._pdf.PDFStreamBase):
+	elif isinstance(obj, _pdf.PDFStreamBase):
 		dat.append( ('Dict',) )
 		dat.append( ('Stream',) )
 		dat.append( ('StreamRaw',) )
 
-	elif isinstance(obj, pypdfproc._pdf.Dictionary):
+	elif isinstance(obj, _pdf.Dictionary):
 		keys = obj.dictionary.keys()
 		keys.sort()
 
@@ -816,7 +815,7 @@ class PDFCmdState:
 		elif type(item) == tuple:
 			# Tuple format is (object, text to show)
 			return item[1]
-		elif isinstance(item, pypdfproc._pdf.PDFBase):
+		elif isinstance(item, _pdf.PDFBase):
 			return str(item.__class__).split('.')[-1]
 		else:
 			raise TypeError("Unrecognized pwd stack type: '%s'" % item)
@@ -883,10 +882,10 @@ class PDFCmdState:
 			if type(prev) == list:
 				idx = int(line)
 				self._pwd.append( (prev[idx],"[%d]"%idx) )
-			elif isinstance(prev, pypdfproc._pdf.Dictionary):
+			elif isinstance(prev, _pdf.Dictionary):
 				self._pwd.append( (prev, "Dict") )
 
-			elif isinstance(prev, pypdfproc._pdf.PDFStreamBase):
+			elif isinstance(prev, _pdf.PDFStreamBase):
 				line = line.lower()
 
 				if line == 'dict':
@@ -898,14 +897,14 @@ class PDFCmdState:
 				else:
 					raise CmdError("Stream has no property '%s'" % line)
 
-			elif isinstance(prev, pypdfproc._pdf.PDFBase):
+			elif isinstance(prev, _pdf.PDFBase):
 				# TODO: requires case to be exact
 				ps = prev.getsetprops()
 				if '_Loader' in ps: del ps['_Loader']
 				k = '_'+line
 				if k in ps:
 					v = getattr(prev, line)
-					if isinstance(v, pypdfproc._pdf.Array) or type(v) == list:
+					if isinstance(v, _pdf.Array) or type(v) == list:
 						# Tuple of (object, text to show in pwd)
 						self._pwd.append( (v, line) )
 					else:
@@ -944,7 +943,7 @@ class PDFCmdState:
 
 			typ = self._pwd[1]
 
-			if isinstance(typ, pypdfproc._pdf.Catalog):
+			if isinstance(typ, _pdf.Catalog):
 				root = typ
 
 				dat = []
@@ -969,13 +968,13 @@ class PDFCmdState:
 
 		elif len(self._pwd) > 2:
 			item = self._pwd[-1]
-			if isinstance(item, pypdfproc._pdf.PDFBase):
+			if isinstance(item, _pdf.PDFBase):
 				dat = pdfbase_objects(item)
 				return format_cols(dat)
 
 			# Tuple format is (object, text to show in pwd)
 			elif type(item) == tuple:
-				if isinstance(item[0], pypdfproc._pdf.PDFBase):
+				if isinstance(item[0], _pdf.PDFBase):
 					dat = pdfbase_objects(item[0])
 				elif type(item[0]) == list:
 					dat = []
@@ -990,7 +989,7 @@ class PDFCmdState:
 			elif type(item) == str:
 				pprev = self._pwd[-2]
 
-				if isinstance(pprev, pypdfproc._pdf.PDFStreamBase):
+				if isinstance(pprev, _pdf.PDFStreamBase):
 					if item == 'Stream':
 						# Nowhere else to go
 						return
@@ -1102,8 +1101,9 @@ class PDFCmd(cmd.Cmd):
 		"""Quit the command-line interface (ctrl-d)"""
 		self.do_quit(line)
 
-def Run(args=None):
-	c = PDFCmd()
-	c.setinitargs(args)
-	c.cmdloop(intro="PDF command-line interface. Type 'help' or '?' to get available commands.")
+	@staticmethod
+	def Run(args=None):
+		c = PDFCmd()
+		c.setinitargs(args)
+		c.cmdloop(intro="PDF command-line interface. Type 'help' or '?' to get available commands.")
 
