@@ -883,7 +883,7 @@ class PDFCmdState:
 				idx = int(line)
 				self._pwd.append( (prev[idx],"[%d]"%idx) )
 			elif isinstance(prev, _pdf.Dictionary):
-				self._pwd.append( (prev, "Dict") )
+				self._pwd.append( line )
 
 			elif isinstance(prev, _pdf.PDFStreamBase):
 				line = line.lower()
@@ -892,7 +892,7 @@ class PDFCmdState:
 					self._pwd.append( prev.Dict )
 				elif line == 'stream':
 					self._pwd.append( "Stream" )
-				elif line == 'streamRaw':
+				elif line == 'streamraw':
 					self._pwd.append( "StreamRaw" )
 				else:
 					raise CmdError("Stream has no property '%s'" % line)
@@ -1007,12 +1007,32 @@ class PDFCmdState:
 			raise NotImplementedError
 
 	def cat(self, line):
-		if not len(self._pwd):
+		if len(self._pwd) == 0:
 			raise CmdError("Nothing to cat at root level")
+		elif len(self._pwd) == 1:
+			raise CmdError("Nothing to cat at root level of the file")
+		else:
+			prev = self._pwd[-1]
+			pprev = self._pwd[-2]
 
-		prev = self._pwd[-1]
+			if isinstance(pprev, _pdf.PDFStreamBase):
+				if prev == 'Stream':
+					return pprev.Stream
+				elif prev == 'StreamRaw':
+					return pprev.StreamRaw
+				else:
+					raise CmdError("Unrecognized part of stream: '%s'" % prev)
 
-		raise NotImplementedError
+			elif isinstance(pprev, _pdf.Dictionary):
+				k = prev
+				v = pprev[k]
+
+				if type(v) == str or type(v) == unicode:
+					return v
+				else:
+					raise TypeError("Unrecognized type for dictionary value for key '%s': '%s'" % (k,v))
+			else:
+				raise TypeError("Unrecognized type for cat: '%s'" % prev)
 
 class PDFCmd(cmd.Cmd):
 	"""
