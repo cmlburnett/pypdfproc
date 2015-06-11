@@ -741,7 +741,10 @@ class CmdError(Exception):
 	Catching this exception results in the message being printed.
 	Other exceptions caught result in the full traceback being printed.
 	"""
-	pass
+
+	def get_Message(self):
+		return self.args[0]
+	Message = property(get_Message)
 
 class PDFCmdState:
 	"""
@@ -810,13 +813,13 @@ class PDFCmdState:
 		raise CmdError("File '%s' not found, cannot close it" % item)
 
 	def _pwd_item(self, item):
-		if type(item) == str or type(item) == unicode:
+		if type(item) == str:
 			return item
 		elif type(item) == tuple:
 			# Tuple format is (object, text to show)
 			return item[1]
 		elif isinstance(item, _pdf.PDFBase):
-			return str(item.__class__).split('.')[-1]
+			return str(item.__class__.__name__)
 		else:
 			raise TypeError("Unrecognized pwd stack type: '%s' (type %s)" % (item, type(item)))
 
@@ -1031,7 +1034,7 @@ class PDFCmdState:
 				k = prev
 				v = pprev[k]
 
-				if type(v) == str or type(v) == unicode:
+				if type(v) == str:
 					return v
 				else:
 					raise TypeError("Unrecognized type for dictionary value for key '%s': '%s'" % (k,v))
@@ -1071,7 +1074,7 @@ class PDFCmd(cmd.Cmd):
 			raise
 		except CmdError as e:
 			# Print just the message instead of the whole exception traceback
-			print(e.message)
+			print(e.Message)
 		except:
 			traceback.print_exc()
 			# That's it, just print and continue on with life

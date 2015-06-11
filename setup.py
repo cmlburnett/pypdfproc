@@ -25,7 +25,6 @@ desc = "PDF processor"
 long_desc = "Processes and updates PDF files specifically for journal articles and references"
 classifiers = [
 	"Intended Audience :: Developers",
-	"Programming Language :: Python :: 2",
 	"Programming Language :: Python :: 3",
 	"Programming Language :: Python :: 3.3",
 ]
@@ -64,7 +63,7 @@ data_files = [
 ]
 scripts = []
 
-required_python_version = '2.7'
+required_python_version = '3.3'
 
 ###############################################################################
 # end arguments for setup
