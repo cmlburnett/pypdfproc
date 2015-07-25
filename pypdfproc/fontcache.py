@@ -416,10 +416,13 @@ def CIDWidthArrayToMap(arr):
 	"""
 	mapdat = {}
 
+	def iorf(x):
+		return type(x) == int or type(x) == float
+
 	i = 0
 	imax = len(arr)
 	while i < imax:
-		if type(arr[i]) == int and isinstance(arr[i+1], _pdf.Array):
+		if iorf(arr[i]) and isinstance(arr[i+1], _pdf.Array):
 			# Base code is given first
 			basecode = arr[i]
 
@@ -431,7 +434,7 @@ def CIDWidthArrayToMap(arr):
 			# Two: one for int, one for array
 			i += 2
 
-		elif type(arr[i]) == int and type(arr[i+1]) == int and type(arr[i+2]) == int:
+		elif iorf(arr[i]) and iorf(arr[i+1]) and iorf(arr[i+2]):
 			# First and second number define a range, and each within the range
 			# is the same width that is the third number
 			for k in range(arr[i], arr[i+1]+1):
