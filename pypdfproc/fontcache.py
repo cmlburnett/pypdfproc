@@ -399,6 +399,11 @@ class Type0FontCache:
 			else:
 				raise
 
+		if cid not in self.widthmap:
+			print(['f', self.font])
+			print(['u', u])
+			raise KeyError('Could not find glyph CID %d in width array: %s' % (cid, self.widthmap))
+
 		# Create glyph information
 		g = Glyph(cid)
 		g.width = self.widthmap[cid][0]
