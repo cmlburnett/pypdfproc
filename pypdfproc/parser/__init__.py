@@ -884,6 +884,13 @@ class PDFTokenizer:
 			else:
 				return value
 
+		elif klass == _pdf.XObjectForm:
+			if isinstance(value, _pdf.IndirectObject):
+				if key == 'Resources':
+					return self.GetResource(value)
+			else:
+				return value
+
 		print(value)
 		raise NotImplementedError("Dynamic loader for class '%s' and key '%s' not implemented" % (klass.__name__, key))
 

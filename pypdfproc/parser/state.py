@@ -117,12 +117,23 @@ class State:
 	# Position of a start of graphics operations
 	startpos = None
 	# Current position
-	pos = None
+	def get_pos(self):
+		if not len(self.path):
+			return None
+		else:
+			return self.path[-1]
+
+	def set_pos(self, v):
+		self.path.append(v)
+
+	pos = property(get_pos, set_pos)
+	path = None
 
 	graphics = None
 
 	def __init__(self):
 		self.startpos = Pos.Origin()
+		self.path = []
 		self.pos = Pos.Origin()
 
 		self.cm = Mat3x3.Identity()
@@ -156,7 +167,6 @@ class State:
 		Get current text state.
 		"""
 		return self.text
-
 
 	# Graphics state
 
@@ -216,6 +226,7 @@ class State:
 
 		# Draw path
 
+
 	def do_re(self, x,y, w,h):
 		if self.startpos == None:
 			self.startpos = Pos(x,y)
@@ -228,6 +239,7 @@ class State:
 		self.do_h()
 
 	def do_m(self, x,y):
+		self.path.clear()
 		self.pos = Pos(x,y)
 		self.startpos = self.pos
 
@@ -256,8 +268,16 @@ class State:
 		# End subpath
 		self.startpos = None
 
-	def do_Do(self, name):
-		raise NotImplementedError()
+	def do_S(self):
+		pass
+
+	def do_s(self):
+		self.do_S()
+		self.do_h()
+
+	def do_n(self):
+		self.do_h()
+		# don't stroke
 
 	# Colorspaces
 	def do_G(self, v):

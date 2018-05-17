@@ -38,6 +38,9 @@ class PDF:
 	# Font cache keeps track of glyph information, etc.
 	fonts = None
 
+	# Resource stack to descend to find resource objects
+	resources = None
+
 	_StandardFonts = None
 	def get_StandardFonts(self):
 		if self._StandardFonts == None:
@@ -61,6 +64,7 @@ class PDF:
 		self.p.Initialize()
 
 		self.fonts = FontCache(self)
+		self.resources = []
 
 	def Close(self):
 		"""
@@ -122,21 +126,26 @@ class PDF:
 		page = self.GetPage(page)
 
 		# Get resources for the page
-		recs = page.Resources
+		for recs in self.resources:
+			# No fonts founds
+			if recs.Font is None:
+				continue
 
-		# Check that there is a font with this name for this page
-		if fontname not in recs.Font:
-			raise ValueError("Unrecognize font name (%s) for page (%d)" % (fontname, page))
+			# Check that there is a font with this name for this page
+			if fontname not in recs.Font:
+				raise ValueError("Unrecognize font name (%s) for page (%d)" % (fontname, page))
 
-		# Get font object
-		f = recs.Font[fontname]
+			# Get font object
+			f = recs.Font[fontname]
 
-		# If it's an indirect, then fetch object
-		if isindirect(f):
-			f = self.p.GetFont(f)
+			# If it's an indirect, then fetch object
+			if isindirect(f):
+				f = self.p.GetFont(f)
 
-		# Return Font1, Font3, or FontTrue object
-		return f
+			# Return Font1, Font3, or FontTrue object
+			return f
+
+		raise KeyError("Unable to find font '%s'" % fontname)
 
 	def GetFontWidths(self, f):
 		if f.Subtype in ('TrueType', 'Type1'):
@@ -260,9 +269,9 @@ class PDF:
 		for page in pages:
 			try:
 				self.RenderPage(page, callback)
-			except:
+			except Exception as e:
 				# Return is whether or not to stop rendering on exception
-				ret = callback(None, 'page exception', None)
+				ret = callback(None, 'page exception', None, e)
 				if ret:
 					# Quit by re-raising exception
 					raise
@@ -294,12 +303,22 @@ class PDF:
 			ct = cts.Stream
 		#print(ct)
 
+		# Push page resources
+		self.resources.append(page.Resources)
+
 		s = parser.StateManager()
 		callback(s, 'page start', page)
 
-
-		# Tokenize the string as a list of tokens
+		# Tokenize the string as a list of tokens and call the iterating function
 		toks = tt.TokenizeString(ct)['tokens']
+		self._RenderPage_Tokens(page, callback, tt, toks, s)
+
+		callback(s, 'page end', page)
+
+		# Pop page resources
+		self.resources.pop()
+
+	def _RenderPage_Tokens(self, page, callback, tt, toks, s):
 
 		# Iterate through each token and handle it appropriate by manipulating the state object
 		# and calling the callback function as appropriate
@@ -313,12 +332,13 @@ class PDF:
 			elif tok.type == 'i':		s.S.flatness = tok.value[0].value
 
 			# Graphics
-			elif tok.type == 'd':		s.S.d = (tok.value[0], tok.value[1])
-			elif tok.type == 'j':		s.S.j = tok.value[0].value
-			elif tok.type == 'J':		s.S.J = tok.value[0].value
-			elif tok.type == 'M':		s.S.M = tok.value[0].value
-			elif tok.type == 'ri':		s.S.ri = tok.value[0].value
-			elif tok.type == 'w':		s.S.w = tok.value[0].value
+			#   (Table 4.7 on page 219)
+			elif tok.type == 'd':		s.S.d = (tok.value[0], tok.value[1])			# Dash
+			elif tok.type == 'j':		s.S.j = tok.value[0].value						# Line join style
+			elif tok.type == 'J':		s.S.J = tok.value[0].value						# Line cap style
+			elif tok.type == 'M':		s.S.M = tok.value[0].value						# Miter limit
+			elif tok.type == 'ri':		s.S.ri = tok.value[0].value						# Rendering intent
+			elif tok.type == 'w':		s.S.w = tok.value[0].value						# Line width
 			elif tok.type == 'gs':
 				gs = self.GetGraphicsState(page, tok.value[0].value)
 
@@ -361,24 +381,54 @@ class PDF:
 				if gs.AIS != None:		s.S.alphasource = gs.AIS # Alpha mode
 				if gs.TK != None:		raise NotImplementedError("Graphics state setting (TK) text knockout flag not implemented yet")
 
-			elif tok.type == 'h':		s.S.do_h()
-			elif tok.type == 'l':		s.S.do_l(*[v.value for v in tok.value])
-			elif tok.type == 'm':		s.S.do_m(*[v.value for v in tok.value])
-			elif tok.type == 'c':		s.S.do_c(*[v.value for v in tok.value])
-			elif tok.type == 'v':		s.S.do_v(*[v.value for v in tok.value])
-			elif tok.type == 'y':		s.S.do_y(*[v.value for v in tok.value])
-			elif tok.type == 'Fstar':	pass
-			elif tok.type == 'fstar':	pass
-			elif tok.type == 'F':		pass
-			elif tok.type == 'f':		pass
-			elif tok.type == 'S':		pass
-			elif tok.type == 's':		pass
-			elif tok.type == 'n':		pass
-			elif tok.type == 're':		s.S.do_re(*[v.value for v in tok.value])
-			elif tok.type == 'W':		pass
-			elif tok.type == 'Wstar':	pass
+			# Path drawing
+			#    (Table 4.10 on page 230)
+			elif tok.type == 'm':		s.S.do_m(*[v.value for v in tok.value])			# Begin subpath
+			elif tok.type == 'h':		s.S.do_h()										# End subpath
+			elif tok.type == 'l':		s.S.do_l(*[v.value for v in tok.value])			# Append line
+			elif tok.type == 'c':		s.S.do_c(*[v.value for v in tok.value])			# Append cubic Bezier curve (from current point to point with 2 controls)
+			elif tok.type == 'v':		s.S.do_v(*[v.value for v in tok.value])			# Append cubic Bezier curve (from current point to point with current & 1 control point)
+			elif tok.type == 'y':		s.S.do_y(*[v.value for v in tok.value])			# Append cubic Bezier curve (from current point to point with end & 1 control point)
+			elif tok.type == 'Fstar':	pass											# ?
+			elif tok.type == 'fstar':	pass											# Fill the path using even-odd rule
+			elif tok.type == 'F':		pass											# Equivalent to f
+			elif tok.type == 'f':		pass											# Fill the path using non-zero winding number rule
+			elif tok.type == 'S':
+				# Stroke the path
+				s.S.do_S()
+				callback(s, "stroke", page, tok.type)
+			elif tok.type == 's':		
+				# Close and stroke the path (equivalent to h S)
+				s.S.do_s()
+				callback(s, "stroke", page, tok.type)
+			elif tok.type == 'B':		pass											# Fill and stroke (equivalent to f S)
+			elif tok.type == 'b':		pass											# Close, fill, and stroke (equivalent to h B)
+			elif tok.type == 'Bstar':	pass											# Fill and stroke (equivalent to f* S)
+			elif tok.type == 'bstar':	pass											# Fill and stroke (equivalent to h B*)
+			elif tok.type == 'n':		s.S.do_n()										# End and NO stroke (no-op on clipping path)
+			elif tok.type == 're':		s.S.do_re(*[v.value for v in tok.value])		# Append rectangle to current subpath
 
-			elif tok.type == 'Do':		pass # Paint Xobject named by tok.value[0].value
+			#   (Table 4.11 on page 235)
+			elif tok.type == 'W':		pass											# Modify clipping path by intersecting it with current path using non-zero winding rule
+			elif tok.type == 'Wstar':	pass											# Modify clipping path by intersecting it with current path using even-odd rule
+
+			# Paint Xobject named by tok.value[0].value
+			elif tok.type == 'Do':
+				x = page.Resources.XObject[ tok.value[0].value ]
+
+				if isindirect(x):
+					x = self.p.GetXObject(x)
+
+				# Push XObject resources
+				self.resources.append(x.Resources)
+
+				# Tokenize and call recursively
+				x_toks = tt.TokenizeString(x.Stream)['tokens']
+				self._RenderPage_Tokens(page, callback, tt, x_toks, s)
+
+				# Pop XObject resources
+				self.resources.pop()
+
 
 			# Colorspaces
 			elif tok.type == 'cs':		s.S.colorspace = (s.S.colorspace[0], tok.value[0].value)
@@ -408,6 +458,7 @@ class PDF:
 
 				callback(s, 'change font', page, s.T.Tf, s.T.Tfs)
 			elif tok.type in ('Tj', 'TJ'):
+				callback(s, 'text start', page)
 				for subtok in tok.value:
 					#print(['stok', subtok])
 
@@ -429,6 +480,7 @@ class PDF:
 						else:
 							txt = GetTokenString(subtok)
 
+						callback(s, 'text', page, txt)
 						for t in txt:
 							#print(['t', s.T.Tf, t, ord(t)])
 							g = self.GetGlyph(page, s.T.Tf, ord(t))
@@ -442,6 +494,7 @@ class PDF:
 
 							# Adjust for width of glyph
 							s.T.do_Tj(None, g)
+				callback(s, 'text end', page)
 
 			elif tok.type == 'TL':		s.T.TL = tok.value[0].value
 			elif tok.type == 'Tm':		s.T.Tm = parser.Mat3x3(*[v.value for v in tok.value]) # Six numbers representing the Tm matrix
@@ -457,8 +510,6 @@ class PDF:
 
 			else:
 				raise ValueError("Cannot render '%s' token yet" % tok.type)
-
-		callback(s, 'page end', page)
 
 	# --------------------------------------------------------------------------------
 	# Utility functions that provide a some sort of utility function
