@@ -23,8 +23,7 @@ def isindirect(o):
 	return isinstance(o, _pdf.IndirectObject)
 
 class PDF:
-	"""
-	Basic entry point into manipulating PDF files.
+	""" Basic entry point into manipulating PDF files.
 	"""
 
 	# File name, file object (from open()), and mmap object
@@ -1110,8 +1109,9 @@ class PDFCmd(cmd.Cmd):
 		self.state = PDFCmdState()
 
 	def setinitargs(self, args):
-		for arg in args:
-			self.do_open(arg)
+		if args:
+			for arg in args:
+				self.do_open(arg)
 
 	# ----------------------------------------------------------------------------------------
 	# ----------------------------------------------------------------------------------------
