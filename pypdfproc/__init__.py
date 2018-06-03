@@ -1,5 +1,12 @@
 """
-PDF Processor
+PDF Processor in pure python.
+The entire goal of this module is to process PDFs, not generate or modify them.
+The main class is pypdfproc.PDF that opens and iterates through files.
+Not all features of PDF's are supported as specific features are supported as needed.
+Limited support for font type processing is supported as well.
+
+The PDF processor uses PLY to tokenize and step through the PDF.
+An object hierarchy is constructed with dynamically loaded properties that mirrors the data read.
 """
 
 __version__ = "1.0.0"
@@ -20,10 +27,13 @@ from .betterfile import betterfile
 STANDARD_FONT_AFM_ZIP = "StandardFonts_AFM.zip"
 
 def isindirect(o):
+	""" Test to see if object is an indirect object reference. """
 	return isinstance(o, _pdf.IndirectObject)
 
 class PDF:
-	""" Basic entry point into manipulating PDF files.
+	"""
+	Basic entry point into manipulating PDF files.
+	Call constructor with file name to open and initialize parser.
 	"""
 
 	# File name, file object (from open()), and mmap object
@@ -31,13 +41,14 @@ class PDF:
 	f = None
 	m = None
 
-	# PDF parser (from pdf.py)
+	# PDF parser (from parser/pdf.py)
 	p = None
 
 	# Font cache keeps track of glyph information, etc.
 	fonts = None
 
 	# Resource stack to descend to find resource objects
+	# This is a stack with objects pushing their Resource objects as they are encountered
 	resources = None
 
 	_StandardFonts = None
@@ -147,6 +158,11 @@ class PDF:
 		raise KeyError("Unable to find font '%s'" % fontname)
 
 	def GetFontWidths(self, f):
+		"""
+		Get widths of the characters in the font.
+		This is needed to know the origins of glyphs as they are encountered.
+		"""
+
 		if f.Subtype in ('TrueType', 'Type1'):
 			# Not found, find from standard font
 			if f.Widths == None:
@@ -257,6 +273,8 @@ class PDF:
 	def RenderPages(self, callback):
 		"""
 		Renders the entire document by steping through each page in a DFS fashion, and invoking a callback function @callback as appropriate.
+
+		Callback takes 4 arguments: state (parser.StateManager), action (str), page object, *arguments
 		"""
 
 		# Get the root object and the pages in DFS order
@@ -265,7 +283,9 @@ class PDF:
 
 		callback(None, 'render pages start', None)
 
+		# Iterate through pages in depth first search order
 		for page in pages:
+			# Catch exceptions and pass them to the callback, bail if it returns True by re-raising the exception
 			try:
 				self.RenderPage(page, callback)
 			except Exception as e:
@@ -280,6 +300,8 @@ class PDF:
 	def RenderPage(self, page, callback):
 		"""
 		Renders a single page @page by processing every content command and invoking a callback function @callback as appropriate.
+
+		Callback takes 4 arguments: state (parser.StateManager), action (str), page object, *arguments
 		"""
 
 		page = self.GetPage(page)
@@ -287,6 +309,7 @@ class PDF:
 		# The text tokenizer
 		tt = parser.TextTokenizer(self.f, self.p)
 
+		# Concatenate all of the contents into a single text string
 		cts = page.Contents
 		if type(cts) == list or type(cts) == _pdf.Array:
 			ct = []
@@ -305,6 +328,7 @@ class PDF:
 		# Push page resources
 		self.resources.append(page.Resources)
 
+		# Create state manager for the page
 		s = parser.StateManager()
 		callback(s, 'page start', page)
 
@@ -318,6 +342,14 @@ class PDF:
 		self.resources.pop()
 
 	def _RenderPage_Tokens(self, page, callback, tt, toks, s):
+		"""
+		Recursive function that iterates through tokens.
+		 @page: object Page currently being processed
+		 @callback: method to call when certain things are encountered
+		 @tt: text tokenizer
+		 @toks: list of tokens to process
+		 @s: state manager (parser.StateManager)
+		"""
 
 		# Iterate through each token and handle it appropriate by manipulating the state object
 		# and calling the callback function as appropriate
