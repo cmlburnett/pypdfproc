@@ -64,6 +64,9 @@ class FontCache:
 		if f.Subtype == 'Type0':
 			g = self.GetGlyph_Type0(f, cid)
 
+		elif f.Subtype == 'Type1':
+			g = self.GetGlyph_Type1(f, cid)
+
 		elif type(f.Encoding) == str:
 			# NB: unused for WinAnsiEncoding map to bullet
 			# which means g.cid != cid since the glyph returned is that of the bullet with proper cid set
@@ -73,7 +76,7 @@ class FontCache:
 			g = self.GetGlyph_Enc_indobj(f, cid)
 
 		else:
-			raise TypeError("Unrecognized font encoding type: '%s'" % f.Encoding)
+			raise TypeError("Unrecognized font encoding type '%s' for oid=%s and cid=%s" % (f.Encoding, oid, cid))
 
 		# Cache glyph
 		# NB: do not change this to use g.cid instead of cid (see note above about WinAnsiEncoding and bullet)
@@ -95,6 +98,41 @@ class FontCache:
 
 		# Get glyph
 		return self.type0_map[oid].GetGlyph(cid)
+
+	def GetGlyph_Type1(self, f, cid):
+		"""
+		Font @f is a Type1 font, so find glyph for character ID @cid.
+		"""
+
+		#print([f, cid])
+
+		fm = self.pdf.StandardFonts.GetFontMetrics(f.BaseFont)
+		# NB: this is a dictionary indexed by character name
+		wids = fm.GetWidths()
+
+		if f.Encoding is None:
+			encmap = _encodingmap.MapCIDToGlyphName('Std')
+		else:
+			encmap = _encodingmap.MapCIDToGlyphName(f.Encoding)
+
+		if cid not in encmap:
+			raise ValueError("Unable to find character code %d ('%s') in encoding map for encoding %s" % (cid, chr(cid), f.Encoding))
+
+		# Character code to glyph name to unicode
+		gname = encmap[cid]
+		u = _encodingmap.MapGlyphNameToUnicode(gname)
+		if u == None:
+			raise NotImplementedError()
+
+		# Get width based on character code
+		w = wids[gname]
+
+		# Create glyph
+		g = Glyph(cid)
+		g.unicode = u
+		g.width = w[0]
+
+		return g
 
 	def GetGlyph_Enc_str(self, f, cid):
 		"""

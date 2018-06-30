@@ -106,6 +106,7 @@ class PDFTokenizer:
 		if toks[2].type != 'EOF':			raise TypeError("Expected EOF token, got '%s' instead" % toks[2].type)
 
 		offset = toks[1].value
+		#print(['offset', offset])
 
 		x = None
 		t = None
@@ -113,11 +114,13 @@ class PDFTokenizer:
 		prevx = None
 		prevt = None
 
-		# Iterate until startxref in the trialer is zero, which means the end of the chain
+		# Iterate until startxref in the trailer is zero, which means the end of the chain
 		while offset != 0:
 			# Parse xref
 			x = self.ParseXRef(offset)
 			self.pdf.AddContentToMap(offset, x)
+
+			#print(['xx', x])
 
 			if isinstance(x, _pdf.XRefStream):
 				# XRef stream doesn't have a trailer associated, so skip to next ("Prev" in PDF nomenclature) xref/trailer combo
@@ -140,6 +143,7 @@ class PDFTokenizer:
 
 				# Next xref is located here (if zero then no more)
 				if 'Prev' in t.dictionary:
+					#print('jump to prev')
 					offset = t.dictionary['Prev']
 				else:
 					offset = t.startxref.offset
@@ -147,25 +151,25 @@ class PDFTokenizer:
 			else:
 				raise TypeError("Unrecognized xref object type: %s" % x)
 
-			#print(['x', x])
-			#print(['t', t])
-			#print(['offset', offset])
-
 			# Link this xref/trailer combo to previous combo
-			x.prev = prevx
-			if t: t.prev = prevt
+			x.next = prevx
+			if t: t.next = prevt
 
 			# Need to set root xref section in PDF object (this means prevx has not been set yet, so it is None)
 			if prevx == None:
 				self.pdf.rootxref = x
 
 			# Link previous xref/trailer combo to this combo
-			if prevx != None:	prevx.next = x
-			if prevt != None:	prevt.next = t
+			if prevx != None:	prevx.prev = x
+			if prevt != None:	prevt.prev = t
 
 			# Save to link them in next iteration
 			prevx = x
 			if t: prevt = t
+
+			#print(['x', x, prevx])
+			#print(['t', t, prevt])
+			#print(['offset', offset])
 
 			# If there's only one xref/trailer combo then this could lead to recursively looping if this was not checked
 			if offset > 0 and offset in self.pdf.contents:
@@ -445,17 +449,26 @@ class PDFTokenizer:
 
 		while x != None:
 			if isinstance(x, _pdf.XRef):
+				#print(['hi', x])
+				#print(x.trailer)
+				#print(x.trailer.dictionary)
 				if 'Root' in x.trailer.dictionary:
+					#print('root')
 					# This should be an indirect
 					return x.trailer.dictionary['Root']
+				else:
+					x = x.prev
+				#print('not root')
 
 			elif isinstance(x, _pdf.XRefStream):
+				#print(['hib', x])
 				if 'Root' in x.Dict:
 					return x.Dict['Root']
 
 			else:
 				raise TypeError("Unknown xref object type: %s" % x)
 
+		#print('return none')
 		return None
 
 	def GetRootObject(self):

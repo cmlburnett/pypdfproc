@@ -86,8 +86,8 @@ class PDF:
 						self.objmap[p] = me.offset
 
 				# Jump to next xref/trailer combo (last one will set x to None and stop iteration)
-				x = x.next
-				t = t.next
+				x = x.prev
+				t = t.prev
 
 			elif isinstance(x, XRefStream):
 				for me in x.StreamRows:
@@ -126,7 +126,7 @@ class PDF:
 					else:
 						raise TypeError("Unrecognized xref object type: %s" % me)
 
-				x = x.next
+				x = x.prev
 				t = None
 
 			else:
