@@ -645,9 +645,9 @@ class PDFTokenizer:
 		"""
 
 		raise NotImplementedError()
-		print(tokens)
+		#print(tokens)
 		o = TokenHelpers.Convert(tokens[0].value[2])
-		print(o)
+		#print(o)
 		typ = o[0]['Subtype']
 
 		if styp == 'CalGray':	r = _pdf.ColorSpaceGray(self._DynamicLoader)
